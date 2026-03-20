@@ -1,0 +1,47 @@
+﻿NO BOUNDS YET: 'TABLE KEY'
+NO BOUNDS YET: 'ATR72'
+NO BOUNDS YET: '21. Air Conditioning'
+HEADER detected: bounds=(38, 41, 45, 47)
+  raw='        Sequence No. Item             1  2   3 4                         Change     '
+ROW: item='21-10-1    Flow Selector' cat='' inst='' req=''
+     sys_match=False seq_match=True
+ROW: item='1)       Normal Position' cat='C' inst='1' req='0'
+     sys_match=False seq_match=False
+ROW: item='2)       High Position' cat='C' inst='1' req='0'
+     sys_match=False seq_match=False
+ROW: item='21-22-1    Recirculation Fans' cat='C' inst='2' req='0'
+     sys_match=False seq_match=True
+ROW: item='21-22-2    Emergency Ram Air' cat='C' inst='1' req='0'
+     sys_match=False seq_match=True
+ROW: item='Valve (ERAV)' cat='' inst='' req=''
+     sys_match=False seq_match=False
+ROW: item='(ATR72-212A' cat='' inst='' req=''
+     sys_match=False seq_match=False
+ROW: item='"600 Version" with' cat='' inst='' req=''
+     sys_match=False seq_match=False
+ROW: item='Mod. 07696,' cat='' inst='' req=''
+     sys_match=False seq_match=False
+ROW: item='ATR72-212A' cat='' inst='' req=''
+     sys_match=False seq_match=False
+ROW: item='"600F Version" with' cat='' inst='' req=''
+     sys_match=False seq_match=False
+ROW: item='Mod. 07696)' cat='' inst='' req=''
+     sys_match=False seq_match=False
+ROW: item='' cat='C' inst='1' req='0'
+     sys_match=False seq_match=False
+ROW: item='21-22-3    Emergency Ram Air' cat='C' inst='1' req='0'
+     sys_match=False seq_match=True
+ROW: item='Check Valve (ERACKV' cat=')' inst='' req=''
+     sys_match=False seq_match=False
+ROW: item='(ATR72-212A' cat='' inst='' req=''
+     sys_match=False seq_match=False
+ROW: item='"600 Version" with' cat='' inst='' req=''
+     sys_match=False seq_match=False
+ROW: item='Mod. 07696,' cat='' inst='' req=''
+     sys_match=False seq_match=False
+ROW: item='ATR72-212A' cat='' inst='' req=''
+     sys_match=False seq_match=False
+ROW: item='"600F Version" with' cat='' inst='' req=''
+     sys_match=False seq_match=False
+ROW: item='Mod. 07696)' cat='' inst='' req=''
+     sys_match=False seq_match=False

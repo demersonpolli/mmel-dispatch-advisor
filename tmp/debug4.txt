@@ -1,0 +1,28 @@
+﻿Page has 37 rows, bounds=(38, 41, 45, 47)
+  [1] item='TABLE KEY' cat=''
+       -> SKIP (no current_system)
+  [2] item='ATR72' cat=''
+       -> SKIP (no current_system)
+  [3] item='21. Air Conditioning' cat=''
+       -> SYS_MATCH: num=21 cat_empty=True
+       -> SET current_system=Air Conditioning
+  [4] item='21-10-1    Flow Selector' cat=''
+       -> SEQ 21-10-1, cat=''
+  [5] item='1)       Normal Position' cat='C'
+  [6] item='' cat=''
+  [7] item='' cat=''
+  [8] item='2)       High Position' cat='C'
+  [9] item='' cat=''
+  [10] item='' cat=''
+  [11] item='21-22-1    Recirculation Fans' cat='C'
+       -> SEQ 21-22-1, cat='C'
+  [12] item='21-22-2    Emergency Ram Air' cat='C'
+       -> SEQ 21-22-2, cat='C'
+  [13] item='Valve (ERAV)' cat=''
+  [14] item='(ATR72-212A' cat=''
+  [15] item='"600 Version" with' cat=''
+  [16] item='Mod. 07696,' cat=''
+  [17] item='ATR72-212A' cat=''
+  [18] item='"600F Version" with' cat=''
+  [19] item='Mod. 07696)' cat=''
+  [20] item='' cat='C'
