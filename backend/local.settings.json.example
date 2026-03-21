@@ -1,0 +1,20 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
+    "Cosmos__ConnectionString": "",
+    "Cosmos__DatabaseName": "mmel-dispatch",
+    "Cosmos__ContainerName": "mmel-items",
+    "Blob__ConnectionString": "",
+    "Blob__ContainerName": "mmel-page-images",
+    "Blob__PublicBlobBaseUrl": "",
+    "Blob__SasExpiryMinutes": "60",
+    "Ingestion__SourceDirectory": "../documents/mmel",
+    "Rag__MarkdownPath": "../documents/mmel_rag.md",
+    "Rag__TopChunkCount": "8",
+    "Foundry__ApplicationBaseUrl": "",
+    "Foundry__ApiVersion": "2025-11-15-preview",
+    "Foundry__TokenScope": "https://ai.azure.com/.default"
+  }
+}

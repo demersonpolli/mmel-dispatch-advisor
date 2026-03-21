@@ -1,3 +1,58 @@
+# ─── Secrets & credentials (never commit) ───────────────────────────────────
+.env
+.env.*
+!.env.example
+!.env.*.example
+.envrc
+*.pfx
+*.p12
+*.pem
+*.key
+*_key.json
+*credentials*.json
+secrets.json
+**/appsettings.*.local.json
+**/secrets.json
+# Azure Functions local overrides (use *.example in repo)
+**/local.settings.json
+!**/local.settings.json.example
+*.publishsettings
+**/PublishProfiles/*.pubxml.user
+
+# ─── .NET / Azure Functions / build binaries ────────────────────────────────
+**/bin/
+**/obj/
+**/publish-deploy/
+**/deploy.zip
+**/TestResults/
+*.user
+*.userosscache
+*.suo
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+# Build outputs live under bin/obj/publish-*; loose binaries in repo root (if any):
+*.nupkg
+*.snupkg
+project.lock.json
+*.trx
+.vs/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+bld/
+[Ll]og/
+[Ll]ogs/
+artifacts/
+coverage*.json
+coverage*.xml
+# Azurite (local Azure Storage emulator)
+__blobstorage__/
+__queuestorage__/
+__azurite_db*__.json
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
@@ -135,8 +190,6 @@ celerybeat.pid
 *.sage.py
 
 # Environments
-.env
-.envrc
 .venv
 env/
 venv/
@@ -205,5 +258,3 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
-
-.env

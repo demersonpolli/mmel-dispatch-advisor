@@ -1,0 +1,8 @@
+# Used when publishing with Azure Functions Core Tools from this folder
+local.settings.json
+*.user
+**/obj/**
+publish-deploy/
+deploy.zip
+.git/
+.gitignore
