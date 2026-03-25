@@ -47,8 +47,5 @@ yarn dev
 Note: Original 562 diagnostics from strict TS + missing types (fixed by configs/installs)
 
 ## Deployment
-The app can be deployed for free on platforms like Vercel or Netlify. Build with `npm run build` in `apps/mobile`, then upload the `dist` folder or connect the GitHub repo for auto-deployment.
-
-- **Vercel**: Connect repo, set root to `apps/mobile`, auto-deploys on push.
-- **Netlify**: Drag `dist` folder or connect repo with build command `npm run build` and publish `dist`.
+The app can be deployed for free on platforms. Build with `npm run build` in `apps/mobile`, then upload the `dist` folder or connect the GitHub repo for auto-deployment.
 
