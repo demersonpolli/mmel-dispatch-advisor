@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Dispatch Advisor Workflow</title>
+  <style>
+    :root {
+      --bg: #07111f;
+      --panel: #0d1a31;
+      --line: rgba(149, 174, 255, 0.45);
+      --text: #f7f9ff;
+      --muted: #aebadb;
+      --accent: #95aeff;
+      --green: #16c47f;
+      --amber: #f2b94b;
+      --red: #ff5d5d;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, Arial, sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(149,174,255,0.12), transparent 30%),
+        radial-gradient(circle at bottom right, rgba(22,196,127,0.08), transparent 25%),
+        var(--bg);
+      color: var(--text);
+    }
+    .wrap {
+      padding: 24px;
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: 32px;
+    }
+    p {
+      color: var(--muted);
+      max-width: 900px;
+      line-height: 1.6;
+    }
+    .canvas {
+      position: relative;
+      min-height: 920px;
+      margin-top: 24px;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 28px;
+      background: rgba(255,255,255,0.02);
+      overflow: hidden;
+    }
+    svg.lines {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+    .node {
+      position: absolute;
+      width: 220px;
+      min-height: 110px;
+      padding: 16px;
+      border-radius: 22px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: var(--panel);
+      box-shadow: 0 20px 50px rgba(0,0,0,0.22);
+      cursor: pointer;
+      transition: transform 0.2s ease, border-color 0.2s ease;
+    }
+    .node:hover {
+      transform: translateY(-4px);
+      border-color: rgba(149,174,255,0.35);
+    }
+    .tag {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: #dce7ff;
+      margin-bottom: 10px;
+    }
+    .title {
+      font-size: 18px;
+      font-weight: 800;
+      margin-bottom: 8px;
+    }
+    .desc {
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.45;
+    }
+    .mobile { left: 38px; top: 70px; }
+    .voice { left: 38px; top: 260px; }
+    .api { left: 320px; top: 160px; }
+    .normalize { left: 600px; top: 70px; }
+    .search { left: 600px; top: 260px; }
+    .db { left: 880px; top: 70px; }
+    .rules { left: 880px; top: 260px; }
+    .report { left: 1160px; top: 70px; }
+    .manual { left: 1160px; top: 260px; }
+    .response { left: 1440px; top: 160px; }
+    .footer {
+      margin-top: 16px;
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .pill {
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+    .panel {
+      margin-top: 18px;
+      padding: 16px;
+      border-radius: 18px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.08);
+      max-width: 900px;
+    }
+    .panel strong {
+      color: var(--text);
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>AI Dispatch Advisor Full-Stack Workflow</h1>
+    <p>
+      A connected flow map for the tablet app, backend orchestration, search, retrieval, rules evaluation,
+      report generation, and manual page delivery. Click any node to inspect its role in the MVP.
+    </p>
+
+    <div class="canvas">
+      <svg class="lines" viewBox="0 0 1680 920" preserveAspectRatio="none">
+        <defs>
+          <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+            <path d="M0,0 L0,6 L9,3 z" fill="rgba(149,174,255,0.55)"></path>
+          </marker>
+        </defs>
+        <path d="M258 125 C290 125, 300 210, 320 215" stroke="var(--line)" stroke-width="3" fill="none" marker-end="url(#arrow)" />
+        <path d="M258 315 C290 315, 300 235, 320 215" stroke="var(--line)" stroke-width="3" fill="none" marker-end="url(#arrow)" />
+        <path d="M540 215 C565 215, 575 125, 600 125" stroke="var(--line)" stroke-width="3" fill="none" marker-end="url(#arrow)" />
+        <path d="M540 215 C565 215, 575 315, 600 315" stroke="var(--line)" stroke-width="3" fill="none" marker-end="url(#arrow)" />
+        <path d="M820 125 C845 125, 855 125, 880 125" stroke="var(--line)" stroke-width="3" fill="none" marker-end="url(#arrow)" />
+        <path d="M820 315 C845 315, 855 315, 880 315" stroke="var(--line)" stroke-width="3" fill="none" marker-end="url(#arrow)" />
+        <path d="M1100 125 C1125 125, 1135 125, 1160 125" stroke="var(--line)" stroke-width="3" fill="none" marker-end="url(#arrow)" />
+        <path d="M1100 315 C1125 315, 1135 315, 1160 315" stroke="var(--line)" stroke-width="3" fill="none" marker-end="url(#arrow)" />
+        <path d="M1380 125 C1410 125, 1415 215, 1440 215" stroke="var(--line)" stroke-width="3" fill="none" marker-end="url(#arrow)" />
+        <path d="M1380 315 C1410 315, 1415 215, 1440 215" stroke="var(--line)" stroke-width="3" fill="none" marker-end="url(#arrow)" />
+      </svg>
+
+      <div class="node mobile" data-detail="Tablet-first React Native UI. Mechanics input the issue in free text and review the returned report and evidence.">
+        <div class="tag">Frontend</div>
+        <div class="title">Tablet App</div>
+        <div class="desc">Free-text issue entry, aircraft selection, report display, manual page preview.</div>
+      </div>
+
+      <div class="node voice" data-detail="Optional speech-to-text entry point so mechanics can dictate failures during turnarounds.">
+        <div class="tag">Input</div>
+        <div class="title">Speech to Text</div>
+        <div class="desc">Voice capture path for fast hands-busy defect entry.</div>
+      </div>
+
+      <div class="node api" data-detail="Express API receives the request and coordinates retrieval and response assembly.">
+        <div class="tag">Backend</div>
+        <div class="title">API Gateway</div>
+        <div class="desc">Receives issue + aircraft, validates payload, starts dispatch analysis.</div>
+      </div>
+
+      <div class="node normalize" data-detail="Normalizes aircraft names and issue terms so search quality improves before retrieval.">
+        <div class="tag">Logic</div>
+        <div class="title">Issue Normalization</div>
+        <div class="desc">Aircraft matching, token cleanup, keyword expansion.</div>
+      </div>
+
+      <div class="node search" data-detail="This represents Azure AI Search in production. The local MVP uses an in-memory search scorer instead.">
+        <div class="tag">Search</div>
+        <div class="title">Azure AI Search</div>
+        <div class="desc">Finds candidate MMEL equipment records from indexed aircraft and equipment data.</div>
+      </div>
+
+      <div class="node db" data-detail="NoSQL storage layer for full MMEL records and manual page payloads.">
+        <div class="tag">Data</div>
+        <div class="title">NoSQL MMEL Store</div>
+        <div class="desc">Stores structured MEL/MMEL JSON records and Base64 JPEG manual pages.</div>
+      </div>
+
+      <div class="node rules" data-detail="Evaluates installed vs required counts, placards, repair intervals, and other dispatch conditions.">
+        <div class="tag">Decision</div>
+        <div class="title">Dispatch Rules Engine</div>
+        <div class="desc">Builds recommendation, actions, limitations, and traceability evidence.</div>
+      </div>
+
+      <div class="node report" data-detail="Agent-style summary generation for the final concise dispatch report.">
+        <div class="tag">Output</div>
+        <div class="title">Report Synthesis</div>
+        <div class="desc">Creates the 1–2 paragraph recommendation and operational action list.</div>
+      </div>
+
+      <div class="node manual" data-detail="Resolves the manual page payload and prepares it for mobile rendering.">
+        <div class="tag">Evidence</div>
+        <div class="title">Manual Page Decode</div>
+        <div class="desc">Returns the JPEG page for direct review inside the app.</div>
+      </div>
+
+      <div class="node response" data-detail="Final JSON response consumed by the tablet UI.">
+        <div class="tag">Client</div>
+        <div class="title">Structured Response</div>
+        <div class="desc">Severity, summary, actions, limitations, traceability, and manual page payload.</div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <div class="pill">React Native / Expo</div>
+      <div class="pill">Express API</div>
+      <div class="pill">Azure AI Search placeholder</div>
+      <div class="pill">NoSQL MMEL store</div>
+      <div class="pill">RAG-style orchestration</div>
+    </div>
+
+    <div class="panel" id="detailPanel">
+      <strong>Selected node:</strong>
+      <span id="detailText">Click a node to inspect its role in the flow.</span>
+    </div>
+  </div>
+
+  <script>
+    const nodes = document.querySelectorAll('.node');
+    const detailText = document.getElementById('detailText');
+
+    nodes.forEach((node) => {
+      node.addEventListener('click', () => {
+        detailText.textContent = node.dataset.detail || 'No details available.';
+      });
+    });
+  </script>
+</body>
+</html>

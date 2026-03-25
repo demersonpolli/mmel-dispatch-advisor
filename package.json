@@ -1,0 +1,29 @@
+{
+  "name": "ai-dispatch-advisor-monorepo",
+  "private": true,
+  "version": "1.0.0",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "install:all": "yarn workspaces foreach run install",
+    "dev:api": "cd apps/api && yarn dev",
+    "dev:mobile": "cd apps/mobile && yarn dev",
+    "dev": "concurrently \"yarn dev:api\" \"yarn dev:mobile\"",
+    "start:mobile": "cd apps/mobile && yarn start",
+    "start": "yarn start:mobile",
+    "test:mobile": "cd apps/mobile && yarn test",
+    "test:all": "yarn workspaces foreach --all run test",
+    "build:api": "cd apps/api && yarn build"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "yarn": "^1.22.22"
+  },
+  "packageManager": "yarn@1.22.22",
+  "dependencies": {
+    "@expo/metro-runtime": "~5.0.5",
+    "react-dom": "18.2.0",
+    "react-native-web": "~0.18.10"
+  }
+}

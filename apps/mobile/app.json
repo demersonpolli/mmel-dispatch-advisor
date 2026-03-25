@@ -1,0 +1,11 @@
+{
+  "expo": {
+    "name": "AI Dispatch Advisor",
+    "slug": "ai-dispatch-advisor",
+    "version": "1.0.0",
+    "orientation": "landscape",
+    "userInterfaceStyle": "dark",
+    "platforms": ["ios", "android", "web"],
+    "assetBundlePatterns": ["**/*"]
+  }
+}
