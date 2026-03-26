@@ -1,3 +1,8 @@
+# ─── Large data files ────────────────────────────────────────────────────────
+# Parsed MMEL JSON/PDF files are large and stored in Blob Storage instead
+documents/mmel/**/*.json
+documents/mmel/**/*.pdf
+
 # ─── Secrets & credentials (never commit) ───────────────────────────────────
 .env
 .env.*
