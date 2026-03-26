@@ -49,9 +49,6 @@ public sealed class FoundryAgentChatService : IFoundryAgentChatService
         var tokenRequest = new TokenRequestContext([scope]);
         var accessToken = await _credential.GetTokenAsync(tokenRequest, cancellationToken);
 
-        var combined =
-            $"## System instructions\n{systemPrompt}\n\n## User message\n{userPrompt}";
-
         var apiVersion = string.IsNullOrWhiteSpace(_options.ApiVersion)
             ? "2025-11-15-preview"
             : _options.ApiVersion.Trim();
@@ -59,9 +56,18 @@ public sealed class FoundryAgentChatService : IFoundryAgentChatService
         var url =
             $"{baseUrl}/responses?api-version={Uri.EscapeDataString(apiVersion)}";
 
+        // The Responses API separates system-level guidance ("instructions") from the
+        // user turn ("input"). Sending both as a combined string in "input" works but
+        // loses role semantics and makes system instructions visible to context windows
+        // as user content. "model" is omitted intentionally — the Agent Application
+        // endpoint resolves it from the published agent definition server-side.
         using var request = new HttpRequestMessage(HttpMethod.Post, url);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken.Token);
-        request.Content = JsonContent.Create(new { input = combined });
+        request.Content = JsonContent.Create(new
+        {
+            instructions = systemPrompt,
+            input = userPrompt
+        });
 
         var client = _httpClientFactory.CreateClient(nameof(FoundryAgentChatService));
         client.Timeout = TimeSpan.FromMinutes(5);
@@ -99,6 +105,9 @@ public sealed class FoundryAgentChatService : IFoundryAgentChatService
                 return outputText.GetString() ?? string.Empty;
             }
 
+            // Walk output[].content[] and collect only "output_text" blocks.
+            // Filtering by type avoids accidentally including "refusal" blocks,
+            // which also carry a "text" field but represent a safety refusal.
             if (root.TryGetProperty("output", out var output) && output.ValueKind == JsonValueKind.Array)
             {
                 var sb = new System.Text.StringBuilder();
@@ -112,7 +121,10 @@ public sealed class FoundryAgentChatService : IFoundryAgentChatService
 
                     foreach (var part in content.EnumerateArray())
                     {
-                        if (part.TryGetProperty("text", out var text) &&
+                        if (part.TryGetProperty("type", out var type) &&
+                            type.ValueKind == JsonValueKind.String &&
+                            type.GetString() == "output_text" &&
+                            part.TryGetProperty("text", out var text) &&
                             text.ValueKind == JsonValueKind.String)
                         {
                             sb.Append(text.GetString());

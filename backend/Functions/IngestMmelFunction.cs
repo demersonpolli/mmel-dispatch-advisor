@@ -22,15 +22,38 @@ public sealed class IngestMmelFunction
         var query = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
         var file = query.Get("file");
 
-        var result = await _ingestionService.IngestAsync(file, cancellationToken);
-
-        var response = req.CreateResponse(HttpStatusCode.OK);
-        await response.WriteAsJsonAsync(new
+        try
         {
-            result.FilesProcessed,
-            result.ItemsUpserted,
-            result.ImagesUploaded
-        }, cancellationToken);
-        return response;
+            var result = await _ingestionService.IngestAsync(file, cancellationToken);
+            var response = req.CreateResponse(HttpStatusCode.OK);
+            await response.WriteAsJsonAsync(new
+            {
+                result.FilesProcessed,
+                result.ItemsUpserted,
+                result.ImagesUploaded
+            }, cancellationToken);
+            return response;
+        }
+        catch (DirectoryNotFoundException ex)
+        {
+            var err = req.CreateResponse(HttpStatusCode.BadRequest);
+            await err.WriteStringAsync(ex.Message, CancellationToken.None);
+            return err;
+        }
+        catch (InvalidOperationException ex)
+        {
+            var err = req.CreateResponse(HttpStatusCode.BadRequest);
+            await err.WriteStringAsync(ex.Message, CancellationToken.None);
+            return err;
+        }
+        catch (Exception ex)
+        {
+            var status = ex is OperationCanceledException
+                ? HttpStatusCode.RequestTimeout
+                : HttpStatusCode.InternalServerError;
+            var err = req.CreateResponse(status);
+            await err.WriteStringAsync(ex.Message, CancellationToken.None);
+            return err;
+        }
     }
 }

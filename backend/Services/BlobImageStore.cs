@@ -7,6 +7,9 @@ namespace backend.Services;
 public interface IBlobImageStore
 {
     Task<string> UploadBase64JpegAsync(string blobPath, string base64Content, CancellationToken cancellationToken);
+
+    /// <summary>Lightweight connectivity check used by the health endpoint.</summary>
+    Task<bool> PingAsync(CancellationToken cancellationToken);
 }
 
 public sealed class BlobImageStore : IBlobImageStore
@@ -22,6 +25,12 @@ public sealed class BlobImageStore : IBlobImageStore
         }
 
         _containerClient = new BlobContainerClient(settings.ConnectionString, settings.ContainerName);
+    }
+
+    public async Task<bool> PingAsync(CancellationToken cancellationToken)
+    {
+        await _containerClient.GetPropertiesAsync(cancellationToken: cancellationToken);
+        return true;
     }
 
     public async Task<string> UploadBase64JpegAsync(string blobPath, string base64Content, CancellationToken cancellationToken)

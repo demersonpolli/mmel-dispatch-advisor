@@ -31,4 +31,23 @@
       <CopyToPublishDirectory>Never</CopyToPublishDirectory>
     </None>
   </ItemGroup>
+
+  <!--
+    Bundle mmel_rag.md alongside the app output.
+    Resolved via Rag__MarkdownPath=mmel_rag.md relative to AppContext.BaseDirectory in Azure.
+    Locally, local.settings.json points to ../../../documents/mmel_rag.md instead.
+
+    NOTE: MMEL JSON data files are NOT bundled here. They are large (2+ GB with embedded
+    base64 images) and would make the zip deploy too large. Instead:
+      - In Azure: ingest was triggered once during initial setup; data lives in Cosmos + Blob.
+      - Locally: set Ingestion__SourceDirectory=../../../documents/mmel in local.settings.json
+        and call POST /api/ingest locally whenever a re-ingest is needed.
+  -->
+  <ItemGroup>
+    <Content Include="..\documents\mmel_rag.md">
+      <Link>mmel_rag.md</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>Always</CopyToPublishDirectory>
+    </Content>
+  </ItemGroup>
 </Project>

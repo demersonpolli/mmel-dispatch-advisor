@@ -8,25 +8,37 @@ namespace backend.Services;
 public interface IRagMarkdownService
 {
     IReadOnlyList<string> GetTopChunks(string userQuery, int count);
+    int ChunkCount { get; }
 }
 
 /// <summary>Lightweight RAG over mmel_rag.md: splits on ### headings and ranks by token overlap with the user query.</summary>
 public sealed class RagMarkdownService : IRagMarkdownService
 {
-    private readonly RagOptions _options;
-    private readonly ILogger<RagMarkdownService> _logger;
-    private IReadOnlyList<string>? _chunks;
+    private readonly Lazy<IReadOnlyList<string>> _chunks;
 
     public RagMarkdownService(IOptions<RagOptions> options, ILogger<RagMarkdownService> logger)
     {
-        _options = options.Value;
-        _logger = logger;
+        var opts = options.Value;
+        _chunks = new Lazy<IReadOnlyList<string>>(() =>
+        {
+            var path = ResolvePath(opts.MarkdownPath);
+            if (!File.Exists(path))
+            {
+                logger.LogWarning("RAG markdown not found at {Path}", path);
+                return [];
+            }
+
+            var fullText = File.ReadAllText(path, Encoding.UTF8);
+            var chunks = SplitIntoItemChunks(fullText);
+            logger.LogInformation("Loaded RAG markdown: {Path}, {Count} chunks", path, chunks.Count);
+            return chunks;
+        }, isThreadSafe: true);
     }
 
     public IReadOnlyList<string> GetTopChunks(string userQuery, int count)
     {
-        EnsureLoaded();
-        if (_chunks is null || _chunks.Count == 0)
+        var chunks = _chunks.Value;
+        if (chunks.Count == 0)
         {
             return [];
         }
@@ -34,39 +46,19 @@ public sealed class RagMarkdownService : IRagMarkdownService
         var terms = Tokenize(userQuery);
         if (terms.Count == 0)
         {
-            return _chunks.Take(count).ToList();
+            return chunks.Take(count).ToList();
         }
 
-        var scored = _chunks
+        return chunks
             .Select(chunk => (chunk, score: ScoreChunk(chunk, terms)))
             .OrderByDescending(x => x.score)
             .ThenBy(x => x.chunk.Length)
             .Take(count)
             .Select(x => x.chunk)
             .ToList();
-
-        return scored;
     }
 
-    private void EnsureLoaded()
-    {
-        if (_chunks is not null)
-        {
-            return;
-        }
-
-        var path = ResolvePath(_options.MarkdownPath);
-        if (!File.Exists(path))
-        {
-            _logger.LogWarning("RAG markdown not found at {Path}", path);
-            _chunks = [];
-            return;
-        }
-
-        var fullText = File.ReadAllText(path, Encoding.UTF8);
-        _chunks = SplitIntoItemChunks(fullText);
-        _logger.LogInformation("Loaded RAG markdown: {Path}, {Count} chunks", path, _chunks.Count);
-    }
+    public int ChunkCount => _chunks.Value.Count;
 
     private static string ResolvePath(string configuredPath)
     {

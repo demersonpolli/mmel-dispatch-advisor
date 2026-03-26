@@ -40,8 +40,12 @@ from parse_boeing import parse_pdf as parse_boeing
 from parse_bd500 import parse_pdf as parse_bd500
 from mmel_common import embed_page_images
 
-# PDF files and their parser configuration
-# (relative path from documents/mmel, parser function, kwargs, output override)
+# PDF files and their parser configuration.
+# Format: (relative path from documents/mmel, parser function, kwargs, output filename override)
+#
+# Not included (PDFs removed):
+#   - boeing/B-787_Rev_19.pdf        (Boeing 787)
+#   - embraer/MMEL ERJ-170-190 Rev 20.pdf  (Embraer ERJ-170/190)
 PDF_CONFIG = [
     # Airbus
     ("airbus/A-320_Rev_32.pdf", parse_standard, {}, None),
@@ -57,13 +61,6 @@ PDF_CONFIG = [
     # Embraer
     ("embraer/EMB-135-145_Rev_19.pdf", parse_standard, {}, None),
 ]
-
-# Cover-page-only PDFs (no data)
-SKIP_FILES = {
-    "B-747-8_Rev 7.pdf",
-    "B-787_Rev_19_Cover_Page.pdf",
-    "MMEL ERJ-170-190 Rev 20_Cover Page.pdf",
-}
 
 
 if __name__ == "__main__":

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
@@ -52,160 +53,189 @@ public sealed class DispatchAdvisorService : IDispatchAdvisorService
             throw new ArgumentException("Query is required.", nameof(userQuery));
         }
 
-        var ragChunks = _rag.GetTopChunks(userQuery, _ragOptions.TopChunkCount).ToList();
-        var ragContext = string.Join("\n\n---\n\n", ragChunks);
+        var queryHash = ComputeQueryHash(userQuery);
+        var totalSw = Stopwatch.StartNew();
+        var aircraftNorm = "(unknown)";
 
-        var extraction = await ExtractKeysAsync(userQuery, ragContext, ragChunks, cancellationToken);
-
-        var aircraftNorm = extraction.AircraftNorm.Trim().ToLowerInvariant();
-        var collected = new Dictionary<string, MmelItemDocument>(StringComparer.Ordinal);
-
-        foreach (var seq in extraction.SequenceCandidates)
+        try
         {
-            var norm = RemarkReferenceExtractor.NormalizeSequenceToken(seq);
-            if (string.IsNullOrEmpty(norm))
+            var ragChunks = _rag.GetTopChunks(userQuery, _ragOptions.TopChunkCount).ToList();
+            var ragContext = string.Join("\n\n---\n\n", ragChunks);
+
+            var extractSw = Stopwatch.StartNew();
+            var extraction = await ExtractKeysAsync(userQuery, ragContext, ragChunks, cancellationToken);
+            extractSw.Stop();
+
+            aircraftNorm = extraction.AircraftNorm.Trim().ToLowerInvariant();
+
+            _logger.LogInformation(
+                "Advise extraction aircraft={AircraftNorm} searchTermsCount={SearchTermsCount} foundryLatencyMs={LatencyMs} queryHash={QueryHash}",
+                aircraftNorm, extraction.SearchTerms.Count, extractSw.ElapsedMilliseconds, queryHash);
+
+            var collected = new Dictionary<string, MmelItemDocument>(StringComparer.Ordinal);
+
+            foreach (var seq in extraction.SequenceCandidates)
             {
-                continue;
+                var norm = RemarkReferenceExtractor.NormalizeSequenceToken(seq);
+                if (string.IsNullOrEmpty(norm))
+                {
+                    continue;
+                }
+
+                var hits = await _cosmos.GetByAircraftAndSequenceAsync(aircraftNorm, norm, cancellationToken);
+                foreach (var h in hits)
+                {
+                    collected[h.Id] = h;
+                }
             }
 
-            var hits = await _cosmos.GetByAircraftAndSequenceAsync(aircraftNorm, norm, cancellationToken);
-            foreach (var h in hits)
+            foreach (var term in extraction.SearchTerms.Where(t => !string.IsNullOrWhiteSpace(t)).Take(6))
             {
-                collected[h.Id] = h;
+                var hits = await _cosmos.SearchAsync(aircraftNorm, term, null, 20, cancellationToken);
+                foreach (var h in hits)
+                {
+                    collected[h.Id] = h;
+                }
             }
-        }
 
-        foreach (var term in extraction.SearchTerms.Where(t => !string.IsNullOrWhiteSpace(t)).Take(6))
-        {
-            var hits = await _cosmos.SearchAsync(aircraftNorm, term, null, 20, cancellationToken);
-            foreach (var h in hits)
+            _logger.LogInformation(
+                "Advise retrieval aircraft={AircraftNorm} itemsFound={ItemsFound} queryHash={QueryHash}",
+                aircraftNorm, collected.Count, queryHash);
+
+            if (collected.Count == 0)
             {
-                collected[h.Id] = h;
+                return new AdvisorResponse
+                {
+                    Report = $"No MMEL items were found in Cosmos for aircraft match `{aircraftNorm}` and the derived search terms. " +
+                             "Confirm data was ingested and `aircraftNorm` matches stored documents (re-run ingest after adding sequenceNorm).",
+                    RagContextUsed = ragChunks,
+                    RetrievalNotes = extraction.Notes
+                };
             }
-        }
 
-        if (collected.Count == 0)
-        {
+            var ranked = collected.Values
+                .Select(doc => (doc, score: ScoreDocument(doc, extraction.SearchTerms, userQuery)))
+                .OrderByDescending(x => x.score)
+                .Select(x => x.doc)
+                .ToList();
+
+            var primary = ranked.Take(5).ToList();
+            var primaryIds = new HashSet<string>(primary.Select(p => p.Id), StringComparer.Ordinal);
+
+            var allForRefs = new Dictionary<string, MmelItemDocument>(StringComparer.Ordinal);
+            foreach (var p in primary)
+            {
+                allForRefs[p.Id] = p;
+            }
+
+            var pendingRefs = new Queue<string>();
+            foreach (var p in primary)
+            {
+                foreach (var seq in RemarkReferenceExtractor.ExtractSequenceReferences(p.Remarks))
+                {
+                    pendingRefs.Enqueue(seq);
+                }
+            }
+
+            var seenSeq = new HashSet<string>(StringComparer.Ordinal);
+            while (pendingRefs.Count > 0)
+            {
+                var seq = pendingRefs.Dequeue();
+                if (!seenSeq.Add(seq))
+                {
+                    continue;
+                }
+
+                var related = await _cosmos.GetByAircraftAndSequenceAsync(aircraftNorm, seq, cancellationToken);
+                foreach (var r in related)
+                {
+                    if (allForRefs.TryAdd(r.Id, r))
+                    {
+                        foreach (var inner in RemarkReferenceExtractor.ExtractSequenceReferences(r.Remarks))
+                        {
+                            pendingRefs.Enqueue(inner);
+                        }
+                    }
+                }
+            }
+
+            var orderedItems = allForRefs.Values
+                .OrderByDescending(i => primaryIds.Contains(i.Id))
+                .ThenBy(i => i.SequenceNorm)
+                .ThenBy(i => i.Item, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            var itemPayloads = new List<AdvisorItemPayload>();
+            var carousel = new List<AdvisorImagePayload>();
+
+            foreach (var doc in orderedItems)
+            {
+                var urls = new List<string>();
+                foreach (var kv in doc.ImageRefs.OrderBy(k => int.TryParse(k.Key, out var n) ? n : int.MaxValue))
+                {
+                    try
+                    {
+                        var url = await _blobUrls.GetReadUrlAsync(kv.Value, cancellationToken);
+                        if (!string.IsNullOrEmpty(url))
+                        {
+                            urls.Add(url);
+                            carousel.Add(new AdvisorImagePayload
+                            {
+                                Url = url,
+                                BlobPath = kv.Value,
+                                Page = kv.Key,
+                                ItemId = doc.Id,
+                                Sequence = doc.Sequence
+                            });
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Failed to build URL for blob {Blob}", kv.Value);
+                    }
+                }
+
+                itemPayloads.Add(new AdvisorItemPayload
+                {
+                    Id = doc.Id,
+                    Aircraft = doc.Aircraft,
+                    Sequence = doc.Sequence,
+                    SystemTitle = doc.SystemTitle,
+                    Item = doc.Item,
+                    RepairCategory = doc.RepairCategory,
+                    Installed = doc.Installed,
+                    Required = doc.Required,
+                    Remarks = doc.Remarks,
+                    ImageUrls = urls,
+                    FromCrossReference = !primaryIds.Contains(doc.Id)
+                });
+            }
+
+            var dataForLlm = JsonSerializer.Serialize(itemPayloads, new JsonSerializerOptions { WriteIndented = true });
+            var imageManifest = JsonSerializer.Serialize(carousel, new JsonSerializerOptions { WriteIndented = true });
+
+            var reportSw = Stopwatch.StartNew();
+            var report = await BuildReportAsync(userQuery, dataForLlm, imageManifest, cancellationToken);
+            reportSw.Stop();
+
+            _logger.LogInformation(
+                "Advise completed aircraft={AircraftNorm} items={Items} images={Images} foundryReportLatencyMs={LatencyMs} totalElapsedMs={ElapsedMs} queryHash={QueryHash}",
+                aircraftNorm, itemPayloads.Count, carousel.Count, reportSw.ElapsedMilliseconds, totalSw.ElapsedMilliseconds, queryHash);
+
             return new AdvisorResponse
             {
-                Report = $"No MMEL items were found in Cosmos for aircraft match `{aircraftNorm}` and the derived search terms. " +
-                         "Confirm data was ingested and `aircraftNorm` matches stored documents (re-run ingest after adding sequenceNorm).",
+                Report = report,
+                Items = itemPayloads,
+                Images = carousel,
                 RagContextUsed = ragChunks,
                 RetrievalNotes = extraction.Notes
             };
         }
-
-        var ranked = collected.Values
-            .Select(doc => (doc, score: ScoreDocument(doc, extraction.SearchTerms, userQuery)))
-            .OrderByDescending(x => x.score)
-            .Select(x => x.doc)
-            .ToList();
-
-        var primary = ranked.Take(5).ToList();
-        var primaryIds = new HashSet<string>(primary.Select(p => p.Id), StringComparer.Ordinal);
-
-        var allForRefs = new Dictionary<string, MmelItemDocument>(StringComparer.Ordinal);
-        foreach (var p in primary)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            allForRefs[p.Id] = p;
+            _logger.LogError(ex, "Advise failed aircraft={AircraftNorm} queryHash={QueryHash}", aircraftNorm, queryHash);
+            throw;
         }
-
-        var pendingRefs = new Queue<string>();
-        foreach (var p in primary)
-        {
-            foreach (var seq in RemarkReferenceExtractor.ExtractSequenceReferences(p.Remarks))
-            {
-                pendingRefs.Enqueue(seq);
-            }
-        }
-
-        var seenSeq = new HashSet<string>(StringComparer.Ordinal);
-        while (pendingRefs.Count > 0)
-        {
-            var seq = pendingRefs.Dequeue();
-            if (!seenSeq.Add(seq))
-            {
-                continue;
-            }
-
-            var related = await _cosmos.GetByAircraftAndSequenceAsync(aircraftNorm, seq, cancellationToken);
-            foreach (var r in related)
-            {
-                if (allForRefs.TryAdd(r.Id, r))
-                {
-                    foreach (var inner in RemarkReferenceExtractor.ExtractSequenceReferences(r.Remarks))
-                    {
-                        pendingRefs.Enqueue(inner);
-                    }
-                }
-            }
-        }
-
-        var orderedItems = allForRefs.Values
-            .OrderByDescending(i => primaryIds.Contains(i.Id))
-            .ThenBy(i => i.SequenceNorm)
-            .ThenBy(i => i.Item, StringComparer.OrdinalIgnoreCase)
-            .ToList();
-
-        var itemPayloads = new List<AdvisorItemPayload>();
-        var carousel = new List<AdvisorImagePayload>();
-
-        foreach (var doc in orderedItems)
-        {
-            var urls = new List<string>();
-            foreach (var kv in doc.ImageRefs.OrderBy(k => int.TryParse(k.Key, out var n) ? n : int.MaxValue))
-            {
-                try
-                {
-                    var url = _blobUrls.GetReadUrl(kv.Value);
-                    if (!string.IsNullOrEmpty(url))
-                    {
-                        urls.Add(url);
-                        carousel.Add(new AdvisorImagePayload
-                        {
-                            Url = url,
-                            BlobPath = kv.Value,
-                            Page = kv.Key,
-                            ItemId = doc.Id,
-                            Sequence = doc.Sequence
-                        });
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Failed to build URL for blob {Blob}", kv.Value);
-                }
-            }
-
-            itemPayloads.Add(new AdvisorItemPayload
-            {
-                Id = doc.Id,
-                Aircraft = doc.Aircraft,
-                Sequence = doc.Sequence,
-                SystemTitle = doc.SystemTitle,
-                Item = doc.Item,
-                RepairCategory = doc.RepairCategory,
-                Installed = doc.Installed,
-                Required = doc.Required,
-                Remarks = doc.Remarks,
-                ImageUrls = urls,
-                FromCrossReference = !primaryIds.Contains(doc.Id)
-            });
-        }
-
-        var dataForLlm = JsonSerializer.Serialize(itemPayloads, new JsonSerializerOptions { WriteIndented = true });
-        var imageManifest = JsonSerializer.Serialize(carousel, new JsonSerializerOptions { WriteIndented = true });
-
-        var report = await BuildReportAsync(userQuery, dataForLlm, imageManifest, cancellationToken);
-
-        return new AdvisorResponse
-        {
-            Report = report,
-            Items = itemPayloads,
-            Images = carousel,
-            RagContextUsed = ragChunks,
-            RetrievalNotes = extraction.Notes
-        };
     }
 
     private async Task<ExtractionResult> ExtractKeysAsync(
@@ -354,6 +384,13 @@ public sealed class DispatchAdvisorService : IDispatchAdvisorService
         }
 
         return t;
+    }
+
+    private static string ComputeQueryHash(string query)
+    {
+        var bytes = System.Security.Cryptography.SHA256.HashData(
+            System.Text.Encoding.UTF8.GetBytes(query));
+        return Convert.ToHexString(bytes, 0, 8).ToLowerInvariant();
     }
 
     private sealed class ExtractionDto
