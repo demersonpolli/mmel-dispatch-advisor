@@ -448,7 +448,7 @@ function App() {
             min-height: 200px;
           }
           .mmel-card {
-            flex: 0 0 350px;
+            flex: 0 0 calc(50% - 8px);
             background: rgba(255, 255, 255, 0.03);
             border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 12px;
