@@ -33,12 +33,16 @@ public sealed class SearchMmelFunction
         var term = query.Get("q");
         var sequence = query.Get("sequence");
 
-        if (string.IsNullOrWhiteSpace(aircraft) || string.IsNullOrWhiteSpace(term))
+        if (string.IsNullOrWhiteSpace(aircraft) || (string.IsNullOrWhiteSpace(term) && string.IsNullOrWhiteSpace(sequence)))
         {
             var bad = req.CreateResponse(HttpStatusCode.BadRequest);
-            await bad.WriteStringAsync("Query params 'aircraft' and 'q' are required.", cancellationToken);
+            await bad.WriteStringAsync("Query params 'aircraft' and either 'q' or 'sequence' are required.", cancellationToken);
             return bad;
         }
+
+        // If sequence is provided but term is empty, use a placeholder to satisfy the search logic if needed, 
+        // or we can handle it in the repository.
+        term ??= string.Empty;
 
         var pageSize = 25;
         if (int.TryParse(query.Get("limit"), out var parsedLimit))
