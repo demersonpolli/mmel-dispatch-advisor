@@ -8,7 +8,9 @@ using Microsoft.Extensions.Options;
 
 namespace backend.Services;
 
-/// <summary>Invokes a Microsoft Foundry Agent Application via the stateless Responses API (Entra ID auth).</summary>
+/// <summary>Calls the Azure AI model inference Chat Completions endpoint (Entra ID auth).
+/// Works with Microsoft models (Phi-4, Llama, Mistral) and OpenAI models deployed on
+/// an Azure AI Services resource via /models/chat/completions.</summary>
 public interface IFoundryAgentChatService
 {
     Task<string> CompleteChatAsync(string systemPrompt, string userPrompt, CancellationToken cancellationToken);
@@ -39,34 +41,33 @@ public sealed class FoundryAgentChatService : IFoundryAgentChatService
         if (string.IsNullOrEmpty(baseUrl))
         {
             throw new InvalidOperationException(
-                "Foundry__ApplicationBaseUrl is required. Set it to your Agent Application protocols/openai URL (see README).");
+                "Foundry__ApplicationBaseUrl is required. Set it to the Azure AI Services endpoint, " +
+                "e.g. https://<resource>.services.ai.azure.com");
         }
 
-        var scope = string.IsNullOrWhiteSpace(_options.TokenScope)
-            ? "https://ai.azure.com/.default"
-            : _options.TokenScope.Trim();
-
-        var tokenRequest = new TokenRequestContext([scope]);
+        var tokenRequest = new TokenRequestContext([_options.TokenScope.Trim()]);
         var accessToken = await _credential.GetTokenAsync(tokenRequest, cancellationToken);
 
-        var apiVersion = string.IsNullOrWhiteSpace(_options.ApiVersion)
-            ? "2025-11-15-preview"
-            : _options.ApiVersion.Trim();
+        var deployment = _options.ModelDeployment?.Trim() ?? string.Empty;
+        if (string.IsNullOrEmpty(deployment))
+        {
+            throw new InvalidOperationException(
+                "Foundry__ModelDeployment is required. Set it to your Azure OpenAI deployment name, e.g. gpt-4.1");
+        }
 
-        var url =
-            $"{baseUrl}/responses?api-version={Uri.EscapeDataString(apiVersion)}";
+        var url = $"{baseUrl}/openai/deployments/{Uri.EscapeDataString(deployment)}/chat/completions" +
+                  $"?api-version={Uri.EscapeDataString(_options.ApiVersion.Trim())}";
 
-        // The Responses API separates system-level guidance ("instructions") from the
-        // user turn ("input"). Sending both as a combined string in "input" works but
-        // loses role semantics and makes system instructions visible to context windows
-        // as user content. "model" is omitted intentionally — the Agent Application
-        // endpoint resolves it from the published agent definition server-side.
         using var request = new HttpRequestMessage(HttpMethod.Post, url);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken.Token);
+
         request.Content = JsonContent.Create(new
         {
-            instructions = systemPrompt,
-            input = userPrompt
+            messages = new[]
+            {
+                new { role = "system", content = systemPrompt },
+                new { role = "user",   content = userPrompt   }
+            }
         });
 
         var client = _httpClientFactory.CreateClient(nameof(FoundryAgentChatService));
@@ -78,7 +79,7 @@ public sealed class FoundryAgentChatService : IFoundryAgentChatService
         if (!response.IsSuccessStatusCode)
         {
             _logger.LogError(
-                "Foundry Responses API failed: {Status} {Body}",
+                "Foundry Chat Completions API failed: {Status} {Body}",
                 (int)response.StatusCode,
                 body.Length > 2000 ? body[..2000] + "…" : body);
             response.EnsureSuccessStatusCode();
@@ -99,15 +100,29 @@ public sealed class FoundryAgentChatService : IFoundryAgentChatService
             using var doc = JsonDocument.Parse(json);
             var root = doc.RootElement;
 
+            // Chat Completions format: choices[0].message.content
+            if (root.TryGetProperty("choices", out var choices) && choices.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var choice in choices.EnumerateArray())
+                {
+                    if (choice.TryGetProperty("message", out var msg) &&
+                        msg.TryGetProperty("content", out var content) &&
+                        content.ValueKind == JsonValueKind.String)
+                    {
+                        var s = content.GetString()?.Trim() ?? string.Empty;
+                        if (s.Length > 0) return s;
+                    }
+                }
+            }
+
+            // Responses API fallback: output_text shorthand
             if (root.TryGetProperty("output_text", out var outputText) &&
                 outputText.ValueKind == JsonValueKind.String)
             {
                 return outputText.GetString() ?? string.Empty;
             }
 
-            // Walk output[].content[] and collect only "output_text" blocks.
-            // Filtering by type avoids accidentally including "refusal" blocks,
-            // which also carry a "text" field but represent a safety refusal.
+            // Responses API fallback: output[].content[type=output_text]
             if (root.TryGetProperty("output", out var output) && output.ValueKind == JsonValueKind.Array)
             {
                 var sb = new System.Text.StringBuilder();
@@ -115,9 +130,7 @@ public sealed class FoundryAgentChatService : IFoundryAgentChatService
                 {
                     if (!item.TryGetProperty("content", out var content) ||
                         content.ValueKind != JsonValueKind.Array)
-                    {
                         continue;
-                    }
 
                     foreach (var part in content.EnumerateArray())
                     {
@@ -133,10 +146,7 @@ public sealed class FoundryAgentChatService : IFoundryAgentChatService
                 }
 
                 var s = sb.ToString().Trim();
-                if (s.Length > 0)
-                {
-                    return s;
-                }
+                if (s.Length > 0) return s;
             }
         }
         catch (JsonException)

@@ -21,14 +21,12 @@
   # Infrastructure only (skip code publish):
   .\scripts\deploy-azure.ps1 -SkipPublish
 
-  # Infrastructure + publish, skip ingest trigger:
-  .\scripts\deploy-azure.ps1 -SkipIngest
 #>
 [CmdletBinding()]
 param(
     [string] $ResourceGroup              = "rg-mmel-dispatch-advisor",
 
-    [string] $Location                   = "westus2",
+    [string] $Location                   = "westus",
 
     [string] $SubscriptionId,
 
@@ -50,17 +48,17 @@ param(
     [string] $CosmosContainerName = "mmel-items",
     [string] $BlobContainerName = "mmel-page-images",
 
-    # Foundry is optional at deploy time; set later via Azure portal or re-run the script.
-    [string] $FoundryApplicationBaseUrl = "",
-    [string] $FoundryApiVersion = "2025-11-15-preview",
-    [string] $FoundryTokenScope = "https://ai.azure.com/.default",
+    # Foundry AI Services — auto-created and configured by the script.
+    # FoundryLocation is kept separate from Location so it is NOT overridden when an
+    # existing resource group is detected in a different region (westus2 in this case).
+    [string] $FoundryResourceName    = "mmel-dispatch-foundry",
+    [string] $FoundryLocation        = "westus",
+    [string] $FoundryModelDeployment = "gpt-4.1",
+    [string] $FoundryModelVersion    = "2025-04-14",
 
     # Skip zip-deploy of the backend code (infrastructure + settings only).
-    [switch] $SkipPublish,
-
-    # Skip triggering the ingest endpoint after a successful publish.
-    [switch] $SkipIngest
-)
+    [switch] $SkipPublish
+  )
 
 $ErrorActionPreference = "Continue"   # "Stop" turns native-command stderr into terminating errors
 
@@ -336,6 +334,78 @@ $appInsightsConnStr = az monitor app-insights component show `
     --query connectionString -o tsv
 
 # ---------------------------------------------------------------------------
+# Foundry AI Services
+# ---------------------------------------------------------------------------
+
+Write-Host "==> Ensuring AI Services resource: $FoundryResourceName"
+Invoke-AzCheck { az cognitiveservices account show --name $FoundryResourceName --resource-group $ResourceGroup 2>&1 | Out-Null }
+if ($LASTEXITCODE -ne 0) {
+    # Check for soft-deleted resource (90-day name reservation, same as Key Vault)
+    $softDeletedFoundry = az cognitiveservices account list-deleted --query "[?name=='$FoundryResourceName'].name" -o tsv 2>&1
+    if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($softDeletedFoundry)) {
+        # Purge it so we can recreate in the desired location
+        Write-Host "  Soft-deleted AI Services resource found - purging..."
+        $deletedLocation = az cognitiveservices account list-deleted `
+            --query "[?name=='$FoundryResourceName'].location" -o tsv 2>&1
+        az cognitiveservices account purge `
+            --name $FoundryResourceName `
+            --resource-group $ResourceGroup `
+            --location $deletedLocation 2>&1 | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw "Failed to purge soft-deleted AI Services resource '$FoundryResourceName'." }
+        Write-Host "  Waiting 15s for purge to complete..."
+        Start-Sleep -Seconds 15
+    }
+    Write-Host "  Creating AI Services resource..."
+    az cognitiveservices account create `
+        --name $FoundryResourceName `
+        --resource-group $ResourceGroup `
+        --kind AIServices `
+        --sku S0 `
+        --location $FoundryLocation `
+        --custom-domain $FoundryResourceName `
+        --yes | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "Failed to create AI Services resource '$FoundryResourceName'." }
+}
+else {
+    Write-Host "  AI Services resource already exists: $FoundryResourceName"
+}
+
+$foundryResourceId = az cognitiveservices account show `
+    --name $FoundryResourceName --resource-group $ResourceGroup --query id -o tsv
+# Use the endpoint from ARM directly — after --custom-domain is set this is the
+# resource-specific URL (e.g. https://<name>.cognitiveservices.azure.com/).
+$FoundryApplicationBaseUrl = (az cognitiveservices account show `
+    --name $FoundryResourceName --resource-group $ResourceGroup `
+    --query "properties.endpoint" -o tsv).TrimEnd('/')
+
+Write-Host "==> Ensuring model deployment: $FoundryModelDeployment"
+Invoke-AzCheck { az cognitiveservices account deployment show `
+    --name $FoundryResourceName --resource-group $ResourceGroup `
+    --deployment-name $FoundryModelDeployment 2>&1 | Out-Null }
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "  Deploying model $FoundryModelDeployment ($FoundryModelVersion)..."
+    az cognitiveservices account deployment create `
+        --name $FoundryResourceName `
+        --resource-group $ResourceGroup `
+        --deployment-name $FoundryModelDeployment `
+        --model-name $FoundryModelDeployment `
+        --model-version $FoundryModelVersion `
+        --model-format OpenAI `
+        --sku-capacity 10 `
+        --sku-name "GlobalStandard" | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "Failed to deploy model '$FoundryModelDeployment'." }
+}
+else {
+    Write-Host "  Model deployment already exists: $FoundryModelDeployment"
+}
+
+Write-Host "==> Assigning Cognitive Services User to Function App identity"
+az role assignment create `
+    --assignee $principalId `
+    --role "Cognitive Services User" `
+    --scope $foundryResourceId 2>&1 | Out-Null
+
+# ---------------------------------------------------------------------------
 # Resolve connection strings from Azure
 # ---------------------------------------------------------------------------
 
@@ -458,11 +528,10 @@ $newSettings = [ordered]@{
     "Rag__MarkdownPath"                      = "mmel_rag.md"
     "Rag__TopChunkCount"                     = "8"
     "Ingestion__SourceDirectory"             = ""
-    "Foundry__ApiVersion"                    = $FoundryApiVersion
-    "Foundry__TokenScope"                    = $FoundryTokenScope
-}
-if (-not [string]::IsNullOrWhiteSpace($FoundryApplicationBaseUrl)) {
-    $newSettings["Foundry__ApplicationBaseUrl"] = $FoundryApplicationBaseUrl
+    "Foundry__ApplicationBaseUrl"            = $FoundryApplicationBaseUrl
+    "Foundry__ModelDeployment"               = $FoundryModelDeployment
+    "Foundry__ApiVersion"                    = "2024-02-01"
+    "Foundry__TokenScope"                    = "https://cognitiveservices.azure.com/.default"
 }
 
 Write-Host "==> Applying Function App configuration"
@@ -514,8 +583,9 @@ $localSettings = @{
         "Rag__TopChunkCount"        = "8"
         "Ingestion__SourceDirectory" = "../../../documents/mmel"
         "Foundry__ApplicationBaseUrl" = $FoundryApplicationBaseUrl
-        "Foundry__ApiVersion"       = $FoundryApiVersion
-        "Foundry__TokenScope"       = $FoundryTokenScope
+        "Foundry__ModelDeployment"  = $FoundryModelDeployment
+        "Foundry__ApiVersion"       = "2024-02-01"
+        "Foundry__TokenScope"       = "https://cognitiveservices.azure.com/.default"
     }
 } | ConvertTo-Json -Depth 5
 
@@ -539,16 +609,83 @@ if (-not $SkipPublish) {
         if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
 
         Write-Host "==> Creating deployment zip"
-        Compress-Archive -Path (Join-Path $publishPath "*") -DestinationPath $zipPath -Force
+        # Use Python zipfile so all entries use forward-slash separators.
+        # Compress-Archive on Windows produces backslash paths which the Linux
+        # Functions host cannot read, causing 0 functions to be discovered.
+        python3 -c @"
+import zipfile, pathlib
+src = pathlib.Path(r'$publishPath')
+with zipfile.ZipFile(r'$zipPath', 'w', zipfile.ZIP_DEFLATED) as z:
+    for f in src.rglob('*'):
+        if f.is_file():
+            z.write(f, f.relative_to(src).as_posix())
+"@
 
         Write-Host "==> Zip deploy to Function App"
         az functionapp deployment source config-zip `
             --resource-group $ResourceGroup `
             --name $FunctionAppName `
             --src $zipPath | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw "Zip deploy failed." }
 
         Remove-Item $zipPath -Force -ErrorAction SilentlyContinue
         Remove-Item $publishPath -Recurse -Force -ErrorAction SilentlyContinue
+
+        # config-zip sets WEBSITE_USE_PLACEHOLDER_DOTNETISOLATED=1 which prevents the
+        # .NET isolated worker from binding its gRPC channel properly on cold start.
+        Write-Host "==> Clearing WEBSITE_USE_PLACEHOLDER_DOTNETISOLATED"
+        az functionapp config appsettings set `
+            -g $ResourceGroup -n $FunctionAppName `
+            --settings "WEBSITE_USE_PLACEHOLDER_DOTNETISOLATED=0" | Out-Null
+
+        # The platform writes a default host.json to the Azure Files share with an
+        # incompatible 'extensionBundle' key.  Overwrite it with our correct version.
+        Write-Host "==> Overwriting Azure Files share host.json"
+        $contentShare = az functionapp config appsettings list `
+            -g $ResourceGroup -n $FunctionAppName `
+            --query "[?name=='WEBSITE_CONTENTSHARE'].value" -o tsv
+        $runtimeStorageKey = az storage account keys list `
+            -g $ResourceGroup -n $RuntimeStorageAccountName `
+            --query "[0].value" -o tsv
+        $hostJsonSource = Join-Path $BackendDir "host.json"
+        $contentShareName = "$contentShare".Trim()
+        if (-not [string]::IsNullOrWhiteSpace($contentShareName)) {
+            az storage file upload `
+                --account-name $RuntimeStorageAccountName `
+                --account-key $runtimeStorageKey `
+                --share-name $contentShareName `
+                --source $hostJsonSource `
+                --path "site/wwwroot/host.json" | Out-Null
+            Write-Host "  host.json uploaded to share '$contentShareName'"
+        } else {
+            Write-Host "  WARNING: WEBSITE_CONTENTSHARE not found; skipping host.json upload."
+        }
+
+        # Restart so the corrected settings take effect before we poll for functions.
+        Write-Host "==> Restarting Function App"
+        az functionapp restart -g $ResourceGroup -n $FunctionAppName | Out-Null
+        Write-Host "  Waiting 30s for host startup..."
+        Start-Sleep -Seconds 30
+
+        # Verify that all 4 functions are registered; warn (don't fail) if not.
+        Write-Host "==> Verifying function registration (up to 5 attempts, 30s apart)"
+        $registered = $false
+        for ($i = 1; $i -le 5; $i++) {
+            $funcCount = az functionapp function list `
+                -g $ResourceGroup -n $FunctionAppName `
+                --query "length(@)" -o tsv 2>&1
+            if ($LASTEXITCODE -eq 0 -and "$funcCount" -match '^\d+$' -and [int]$funcCount -ge 4) {
+                Write-Host "  OK: $funcCount function(s) registered."
+                $registered = $true
+                break
+            }
+            Write-Host "  Attempt $i/5: $funcCount function(s) found. Waiting 30s..."
+            Start-Sleep -Seconds 30
+        }
+        if (-not $registered) {
+            Write-Host "  WARNING: Functions did not reach 4 registrations within the timeout."
+            Write-Host "  Check Application Insights for startup errors."
+        }
     }
     finally {
         Pop-Location
@@ -564,19 +701,11 @@ if (-not $SkipPublish) {
         -n $FunctionAppName `
         --query "functionKeys.default" -o tsv
 
-    # Ingest is NOT triggered automatically from here because the MMEL JSON files
-    # (with embedded base64 images) are not bundled with the deploy package - they
-    # are too large (2+ GB) to zip-deploy. Run ingest once locally instead:
-    #
-    #   cd backend
-    #   func start          # local.settings.json points to ../../../documents/mmel
+    # MMEL JSON files (with embedded base64 images, 2+ GB) are not bundled with
+    # the deploy package. Run ingest once locally after the first deploy:
+    #   cd backend && func start
     #   curl -X POST http://localhost:7071/api/ingest
-    #
-    # The data is then stored in Azure Cosmos DB + Blob Storage and used by the
-    # deployed Function App. No re-ingest is needed on subsequent code deploys.
-    if ($SkipIngest) {
-        Write-Host "==> SkipIngest set."
-    }
+    # Data persists in Cosmos + Blob; no re-ingest needed on subsequent deploys.
     Write-Host "==> To populate data: run 'func start' locally and POST http://localhost:7071/api/ingest"
 }
 else {
@@ -608,12 +737,6 @@ Write-Host "  Cosmos     : $CosmosAccountName / $CosmosDatabaseName / $CosmosCon
 Write-Host "  Blob       : $DataStorageAccountName / $BlobContainerName"
 Write-Host "  Key Vault  : $KeyVaultName (secrets: cosmos-connection-string, blob-connection-string)"
 Write-Host "  App Insights: $AppInsightsName (workspace: $LogAnalyticsWorkspaceName)"
+Write-Host "  Foundry    : $FoundryResourceName / $FoundryModelDeployment ($FoundryApplicationBaseUrl)"
 Write-Host "  local.settings.json written to: $localSettingsPath"
-if ([string]::IsNullOrWhiteSpace($FoundryApplicationBaseUrl)) {
-    Write-Host ""
-    Write-Host "  NOTE: Foundry__ApplicationBaseUrl was not provided."
-    Write-Host "  The /api/advise endpoint will fall back to heuristic extraction until set."
-    Write-Host "  Set it with:"
-    Write-Host "    az functionapp config appsettings set -g $ResourceGroup -n $FunctionAppName --settings Foundry__ApplicationBaseUrl=<url>"
-}
 Write-Host "========================================================"

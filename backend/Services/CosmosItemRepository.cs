@@ -41,11 +41,16 @@ public interface ICosmosItemRepository
 
     /// <summary>Lightweight connectivity check used by the health endpoint.</summary>
     Task<bool> PingAsync(CancellationToken cancellationToken);
+
+    /// <summary>Deletes and recreates the container, removing all documents.</summary>
+    Task PurgeAllAsync(CancellationToken cancellationToken);
 }
 
 public sealed class CosmosItemRepository : ICosmosItemRepository
 {
-    private readonly Container _container;
+    private Container _container;
+    private readonly Database _database;
+    private readonly ContainerProperties _containerProps;
 
     public CosmosItemRepository(IOptions<CosmosOptions> options)
     {
@@ -63,9 +68,9 @@ public sealed class CosmosItemRepository : ICosmosItemRepository
             }
         });
 
-        var database = client.CreateDatabaseIfNotExistsAsync(settings.DatabaseName).GetAwaiter().GetResult();
-        _container = database.Database.CreateContainerIfNotExistsAsync(
-            new ContainerProperties(settings.ContainerName, "/aircraftNorm")).GetAwaiter().GetResult().Container;
+        _containerProps = new ContainerProperties(settings.ContainerName, "/aircraftNorm");
+        _database  = client.CreateDatabaseIfNotExistsAsync(settings.DatabaseName).GetAwaiter().GetResult().Database;
+        _container = _database.CreateContainerIfNotExistsAsync(_containerProps).GetAwaiter().GetResult().Container;
     }
 
     public async Task UpsertAsync(MmelItemDocument document, CancellationToken cancellationToken)
@@ -188,6 +193,12 @@ public sealed class CosmosItemRepository : ICosmosItemRepository
     {
         await _container.ReadContainerAsync(cancellationToken: cancellationToken);
         return true;
+    }
+
+    public async Task PurgeAllAsync(CancellationToken cancellationToken)
+    {
+        await _container.DeleteContainerAsync(cancellationToken: cancellationToken);
+        _container = (await _database.CreateContainerIfNotExistsAsync(_containerProps, cancellationToken: cancellationToken)).Container;
     }
 
     private async Task<IReadOnlyList<MmelItemDocument>> QueryAllAsync(QueryDefinition query, CancellationToken cancellationToken)

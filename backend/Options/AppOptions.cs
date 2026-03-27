@@ -33,18 +33,24 @@ public sealed class RagOptions
     public int TopChunkCount { get; set; } = 8;
 }
 
-/// <summary>Microsoft Foundry: published Agent Application using the Responses API protocol.</summary>
+/// <summary>Azure AI Services / OpenAI Responses API configuration.</summary>
 public sealed class FoundryOptions
 {
     /// <summary>
-    /// Base URL of the OpenAI-compatible Responses endpoint (no trailing slash), e.g.
-    /// https://&lt;resource&gt;.services.ai.azure.com/api/projects/&lt;project&gt;/applications/&lt;app&gt;/protocols/openai
+    /// Base URL of the Azure AI Services endpoint (no trailing slash), e.g.
+    /// https://&lt;resource&gt;.cognitiveservices.azure.com
+    /// The service appends /models/chat/completions?api-version=... at call time.
     /// </summary>
     public string ApplicationBaseUrl { get; set; } = string.Empty;
 
-    /// <summary>API version query parameter sent to /responses (see Foundry docs).</summary>
-    public string ApiVersion { get; set; } = "2025-11-15-preview";
+    /// <summary>
+    /// Azure OpenAI deployment name (e.g. "gpt-4o"). Sent as "model" in the request body.
+    /// </summary>
+    public string ModelDeployment { get; set; } = string.Empty;
+
+    /// <summary>API version query parameter for Azure OpenAI chat completions.</summary>
+    public string ApiVersion { get; set; } = "2024-02-01";
 
     /// <summary>Entra ID scope for bearer token (DefaultAzureCredential).</summary>
-    public string TokenScope { get; set; } = "https://ai.azure.com/.default";
+    public string TokenScope { get; set; } = "https://cognitiveservices.azure.com/.default";
 }

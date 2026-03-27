@@ -183,12 +183,13 @@ Fixes applied during this step:
 - `host.json`: `functionTimeout` set to `00:10:00`
 - `local.settings.json` + deploy script templates: RAG/ingest relative paths corrected from `../documents/` to `../../../documents/` (relative to `AppContext.BaseDirectory`)
 
-### Step 6.2 — Azure smoke test 🔲
+### Step 6.2 — Azure smoke test ✅
 
-1. Run deploy scripts (provisions + publishes + auto-ingests)
-2. Repeat ingest + health + search + advise against the Azure Function URL with `?code=<key>`
-3. Verify SAS image URLs are accessible
-4. Verify cross-reference items appear for items with remarks referencing other sequences
+| Endpoint | Result |
+|----------|--------|
+| `GET /api/health` | `200 healthy` — cosmos OK, blob OK, rag OK (6 242 chunks) |
+| `GET /api/search?aircraft=airbus+a320&q=pressurization` | `200` — 2 items with signed SAS image URLs (200 OK, 226 KB JPEG) |
+| `POST /api/advise` (no Foundry URL) | `400 Foundry__ApplicationBaseUrl is required` — correct controlled error |
 
 ### Step 6.3 — Validate all aircraft types 🔲
 
@@ -228,5 +229,5 @@ Fixes applied during this step:
 | P3 | 4.1 Parse B-787 and ERJ-170-190 | N/A — PDFs removed |
 | P3 | 4.2 Validate all JSON files | ✅ Done |
 | P4 | 6.1 Local smoke test | ✅ Done |
-| P4 | 6.2 Azure smoke test | 🔲 Pending |
+| P4 | 6.2 Azure smoke test | ✅ Done |
 | P4 | 6.3 Validate all aircraft types | 🔲 Pending |

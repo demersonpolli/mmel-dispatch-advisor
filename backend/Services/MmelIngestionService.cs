@@ -13,6 +13,9 @@ public sealed record IngestionResult(int FilesProcessed, int ItemsUpserted, int 
 public interface IMmelIngestionService
 {
     Task<IngestionResult> IngestAsync(string? specificFile, CancellationToken cancellationToken);
+
+    /// <summary>Removes all documents from Cosmos DB and all images from blob storage.</summary>
+    Task PurgeAsync(CancellationToken cancellationToken);
 }
 
 public sealed class MmelIngestionService : IMmelIngestionService
@@ -32,6 +35,15 @@ public sealed class MmelIngestionService : IMmelIngestionService
         _repository = repository;
         _blobImageStore = blobImageStore;
         _logger = logger;
+    }
+
+    public async Task PurgeAsync(CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("Purging all Cosmos DB documents...");
+        await _repository.PurgeAllAsync(cancellationToken);
+        _logger.LogInformation("Purging all blob images...");
+        await _blobImageStore.PurgeAllAsync(cancellationToken);
+        _logger.LogInformation("Purge complete.");
     }
 
     public async Task<IngestionResult> IngestAsync(string? specificFile, CancellationToken cancellationToken)

@@ -10,6 +10,9 @@ public interface IBlobImageStore
 
     /// <summary>Lightweight connectivity check used by the health endpoint.</summary>
     Task<bool> PingAsync(CancellationToken cancellationToken);
+
+    /// <summary>Deletes and recreates the blob container, removing all images.</summary>
+    Task PurgeAllAsync(CancellationToken cancellationToken);
 }
 
 public sealed class BlobImageStore : IBlobImageStore
@@ -29,14 +32,31 @@ public sealed class BlobImageStore : IBlobImageStore
 
     public async Task<bool> PingAsync(CancellationToken cancellationToken)
     {
-        await _containerClient.GetPropertiesAsync(cancellationToken: cancellationToken);
+        await _containerClient.CreateIfNotExistsAsync(cancellationToken: cancellationToken);
         return true;
+    }
+
+    public async Task PurgeAllAsync(CancellationToken cancellationToken)
+    {
+        await _containerClient.DeleteIfExistsAsync(cancellationToken: cancellationToken);
+
+        // Container deletion is asynchronous in Azure; retry until the container can be recreated.
+        for (var attempt = 0; ; attempt++)
+        {
+            try
+            {
+                await _containerClient.CreateIfNotExistsAsync(cancellationToken: cancellationToken);
+                return;
+            }
+            catch (Azure.RequestFailedException ex) when (ex.ErrorCode == "ContainerBeingDeleted" && attempt < 30)
+            {
+                await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
+            }
+        }
     }
 
     public async Task<string> UploadBase64JpegAsync(string blobPath, string base64Content, CancellationToken cancellationToken)
     {
-        await _containerClient.CreateIfNotExistsAsync(cancellationToken: cancellationToken);
-
         var bytes = Convert.FromBase64String(base64Content);
         await using var stream = new MemoryStream(bytes);
 
