@@ -607,7 +607,7 @@ function App() {
               {history.length === 0 ? (
                 <p style={{color: '#555', fontStyle: 'italic', textAlign: 'center', marginTop: 40}}>No events recorded</p>
               ) : (
-                history.map((h, i) => (
+                history.slice(0, 2).map((h, i) => (
                   <div 
                     key={i} 
                     onClick={() => {
