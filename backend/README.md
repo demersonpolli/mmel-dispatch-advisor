@@ -24,7 +24,38 @@ Built with .NET **Azure Functions** (isolated worker, **.NET 8**) that ingests M
 | **Foundry** | `FoundryAgentChatService` calls `{ApplicationBaseUrl}/responses` with Entra token (`DefaultAzureCredential`). |
 
 ```mermaid
-![Diagrama de Arquitetura - Fluxo Advise](documents/RAG Client Processing-2026-03-27-012846.png)
+graph TD
+    classDef azureFill fill:#0078D4,stroke:#005A9E,color:#ffffff,stroke-width:2px;
+    classDef storageFill fill:#00BCF2,stroke:#0078D4,color:#ffffff,stroke-width:2px;
+    classDef processFill fill:#F2F2F2,stroke:#333,color:#333,stroke-dasharray: 5 5;
+
+    subgraph UserZone ["Client Side"]
+        UI["🖥️ App UI (Vite/React Native Web)"]
+    end
+
+    subgraph AzureFunction ["Azure Functions (.NET 8 Isolated)"]
+        direction TB
+        Advise["⚡ POST /api/advise"]
+        RAGLogic["🔍 RAG Logic (Chunking)"]
+        Foundry["🧠 Microsoft Foundry Agent"]
+    end
+
+    subgraph DataZone ["Storage & AI Search"]
+        Cosmos["🗄️ Azure Cosmos DB (Items)"]
+        Blob["🖼️ Azure Blob Storage (JPEGs)"]
+        RAGFile["📄 mmel_rag.md"]
+    end
+
+    UI ==> Advise
+    Advise --> RAGLogic
+    RAGLogic -- "Context" --> Foundry
+    RAGLogic -.-> RAGFile
+    Foundry -- "Metadata" --> Cosmos
+    Foundry -- "Image Ref" --> Blob
+    
+    class Advise,Foundry azureFill;
+    class Cosmos,Blob,RAGFile storageFill;
+    class AzureFunction processFill;
 ```
 
 ## Project layout
