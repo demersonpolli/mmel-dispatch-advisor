@@ -6,7 +6,10 @@ export default defineConfig({
   server: {
     port: 3000,
     proxy: {
-      '/api': 'http://localhost:4000'
+      '/api': {
+        target: process.env.VITE_API_BASE_URL ?? 'https://mmel-dispatch-advisor.azurewebsites.net',
+        changeOrigin: true,
+      }
     }
   },
   define: {

@@ -1,0 +1,53 @@
+import React from 'react';
+import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import App from './App';
+
+// Mock AsyncStorage and HapticFeedback
+jest.mock('@react-native-async-storage/async-storage', () => ({
+  getItem: jest.fn(() => Promise.resolve('[]')),
+  setItem: jest.fn(() => Promise.resolve()),
+}));
+
+jest.mock('react-native-haptic-feedback', () => ({
+  trigger: jest.fn(),
+}));
+
+// Mock fetch
+global.fetch = jest.fn();
+
+describe('App Component', () => {
+  beforeEach(() => {
+    (global.fetch as jest.Mock).mockReset();
+  });
+
+  it('renders title and buttons', () => {
+    const { getByText } = render(<App />);
+    expect(getByText('AI DISPATCH ADVISOR')).toBeTruthy();
+    expect(getByText('Analyze Dispatch')).toBeTruthy();
+    expect(getByText('🎤 Voice')).toBeTruthy();
+  });
+
+  it('handles API fallback on error', async () => {
+    (global.fetch as jest.Mock).mockRejectedValueOnce(new Error('Network error'));
+
+    const { getByText } = render(<App />);
+    
+    fireEvent.press(getByText('Analyze Dispatch'));
+
+    await waitFor(() => {
+      expect(getByText('Using fallback')).toBeTruthy();
+    });
+  });
+
+  it('switches aircraft and quick presets', () => {
+    const { getByText, queryAllByText } = render(<App />);
+    
+    // Aircraft chips
+    fireEvent.press(getByText('ATR72'));
+    
+    // Quick presets
+    const presets = queryAllByText(/air conditioning|ELT/i);
+    expect(presets.length).toBeGreaterThan(0);
+  });
+});
+

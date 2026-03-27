@@ -1,0 +1,367 @@
+import React, { useState } from 'react';
+import { jsPDF } from 'jspdf';
+
+const presets = [
+  'AC Pack Inoperative', 
+  'Nav Display Failed', 
+  'ELT Missing', 
+  'Anti-Ice Fault'
+];
+
+function App() {
+  const [aircraft, setAircraft] = useState('Boeing 737 MAX');
+  const [issue, setIssue] = useState('Enter your MEL issue here for instant AI-powered dispatch guidance. For example: "AC Pack Inoperative" or "Nav Display Failed".');
+  const [listening, setListening] = useState(false);
+  const [result, setResult] = useState('');
+  const [supportSpeech, setSupportSpeech] = useState(true);
+  const [opsMode, setOpsMode] = useState('Ramp');
+  const [history, setHistory] = useState([] as string[]);
+  const [isRetrieved, setIsRetrieved] = useState(false);
+  const recognitionRef = React.useRef<any>(null);
+
+  const createPDF = () => {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    let yPosition = 20;
+
+    // Title
+    doc.setFontSize(20);
+    doc.setFont('helvetica', 'bold');
+    doc.text('AI AIRCRAFT DISPATCH REPORT', pageWidth / 2, yPosition, { align: 'center' });
+    yPosition += 20;
+
+    // Section: FLIGHT DISPATCH INFORMATION
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('FLIGHT DISPATCH INFORMATION', 20, yPosition);
+    yPosition += 10;
+
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'normal');
+    const currentDate = new Date().toLocaleString();
+    doc.text(`Date/Time: ${currentDate}`, 20, yPosition);
+    yPosition += 8;
+    doc.text(`Aircraft: ${aircraft}`, 20, yPosition);
+    yPosition += 8;
+    doc.setFont('helvetica', 'bold');
+    if (isRetrieved) {
+      doc.setTextColor(0, 212, 170); // green
+    } else if (issue !== 'Enter your MEL issue here for instant AI-powered dispatch guidance. For example: "AC Pack Inoperative" or "Nav Display Failed".') {
+      doc.setTextColor(255, 215, 0); // yellow
+    } else {
+      doc.setTextColor(255, 255, 255); // white
+    }
+    doc.text(`Reported MEL Issue: ${issue || presets[0]}`, 20, yPosition);
+    doc.setTextColor(0, 0, 0); // reset to black
+    doc.setFont('helvetica', 'normal');
+    yPosition += 15;
+
+    // Section: DISPATCH DECISION
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('DISPATCH DECISION', 20, yPosition);
+    yPosition += 10;
+
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text('CHECK', 20, yPosition);
+    yPosition += 8;
+
+    doc.setFont('helvetica', 'normal');
+    const decisionText = result === 'GO' ? 'Dispatch permitted' : 'Dispatch permitted with conditions';
+    doc.text(decisionText, 20, yPosition);
+    yPosition += 15;
+
+    // Section: OPERATIONAL SUMMARY
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('OPERATIONAL SUMMARY', 20, yPosition);
+    yPosition += 10;
+
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'normal');
+    const summaryText = `Dispatch may be allowed because the equipment count required for dispatch is zero, provided placarding and repair interval controls are in place. Installed units: 1. Required for dispatch: 0.`;
+    const splitSummary = doc.splitTextToSize(summaryText, pageWidth - 40);
+    doc.text(splitSummary, 20, yPosition);
+    yPosition += splitSummary.length * 5 + 10;
+
+    // Section: REQUIRED ACTIONS
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('REQUIRED ACTIONS', 20, yPosition);
+    yPosition += 10;
+
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'normal');
+    const actions = requiredActionsForIssue(issue || presets[0]);
+    actions.forEach(action => {
+      const splitAction = doc.splitTextToSize(`• ${action}`, pageWidth - 40);
+      doc.text(splitAction, 20, yPosition);
+      yPosition += splitAction.length * 5;
+    });
+    yPosition += 10;
+
+    // Section: OPERATIONAL LIMITATIONS
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('OPERATIONAL LIMITATIONS', 20, yPosition);
+    yPosition += 10;
+
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'normal');
+    const limitations = [
+      'Dispatch is only acceptable under the approved MEL item wording.',
+      'Repair interval tracking must be active from time of release.'
+    ];
+    limitations.forEach(limitation => {
+      const splitLim = doc.splitTextToSize(`• ${limitation}`, pageWidth - 40);
+      doc.text(splitLim, 20, yPosition);
+      yPosition += splitLim.length * 5;
+    });
+    yPosition += 10;
+
+    // Section: MMEL TRACEABILITY
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('MMEL TRACEABILITY', 20, yPosition);
+    yPosition += 10;
+
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Record ID: ${aircraft.toLowerCase().replace(' ', '-')}-${issue.toLowerCase().replace(/[^a-z0-9]/g, '-').slice(0, 10)}-001`, 20, yPosition);
+    yPosition += 8;
+    doc.text(`Equipment: ${issue || presets[0]}`, 20, yPosition);
+
+    doc.save('dispatch_report.pdf');
+  };
+
+
+  const requiredActionsForIssue = (issueText: string) => {
+    const normalized = issueText.toLowerCase();
+    if (normalized.includes('ac pack')) return ['Inspect AC packs', 'Reset circuit breaker', 'Log discrepancy in MEL'];
+    if (normalized.includes('nav display')) return ['Perform NVIS self-test', 'Replace failed display', 'Validate flight plan'];
+    if (normalized.includes('elt')) return ['Verify ELT is installed', 'Replace battery if expired', 'Record in technical log'];
+    if (normalized.includes('anti-ice')) return ['Check pitot heat system', 'Inspect wing anti-ice ducts', 'Perform leak test'];
+    if (!normalized) return ['Confirm issue detail', 'Run full systems check'];
+    return ['Evaluate the fault code', 'Dispatch maintenance crew', 'Update report'];
+  };
+
+  const analyze = () => {
+    const status = Math.random() > 0.6 ? 'GO' : 'CONDITIONAL';
+    setResult(status);
+    setHistory([`${new Date().toLocaleTimeString()}: ${aircraft} / ${issue || presets[0]} → ${status}`, ...history.slice(0, 4)]);
+  };
+
+  const aiSummary = `Dispatch analysis for ${aircraft}: issue '${issue || presets[0]}', ops mode ${opsMode}. Decision is ${result || 'pending'}; action items: ${requiredActionsForIssue(issue || presets[0]).join(', ')}.`;
+
+  React.useEffect(() => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setSupportSpeech(false);
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.onresult = (event: any) => {
+      const transcript = (event.results[0][0].transcript || '').trim();
+      if (!transcript) return;
+      setIssue(transcript);
+      setIsRetrieved(true);
+
+      // Trigger analyze automatically if user says it explicitly
+      if (transcript.toLowerCase().includes('analyze') || transcript.toLowerCase().includes('check')) {
+        setTimeout(() => analyze(), 250);
+      }
+    };
+
+    recognition.onend = () => {
+      setListening(false);
+    };
+
+    recognition.onerror = (error: any) => {
+      console.warn('Voice recognition error:', error);
+      setListening(false);
+    };
+
+    recognitionRef.current = recognition;
+
+    return () => {
+    };
+  }, []);
+
+  const voice = () => {
+    if (!supportSpeech) {
+      alert('Voice commands are not supported in this browser');
+      return;
+    }
+
+    if (listening) {
+      recognitionRef.current?.stop();
+      return;
+    }
+
+    setListening(true);
+    setResult('');
+    try {
+      recognitionRef.current?.start();
+    } catch (err) {
+      console.warn('Could not start voice recognition', err);
+      setListening(false);
+    }
+  };
+
+  const cardStyle = {
+    background: 'rgba(255,255,255,0.1)',
+    border: '1px solid rgba(255,255,255,0.2)',
+    backdropFilter: 'blur(25px)',
+    WebkitBackdropFilter: 'blur(25px)',
+    boxShadow: '0 25px 50px rgba(0,0,0,0.5), 0 0 25px rgba(255,255,255,0.1)',
+    borderRadius: 25,
+    padding: 16,
+    color: '#edf6ff'
+  } as React.CSSProperties;
+  const buttonGradient = {backgroundImage: 'linear-gradient(135deg, #667eea, #764ba2)', border: 'none', color: '#ffffff', boxShadow: '0 4px 8px rgba(0,0,0,0.3)'};
+
+
+  return (
+    <div className="app-container" style={{background: 'linear-gradient(135deg, #0a1425 0%, #1a2332 50%, #0f1419 100%)', minHeight: '100vh', color: 'white', fontFamily: 'Arial, sans-serif'}}>
+      <style>
+        {`
+          .app-container {
+            padding: 30px;
+          }
+          .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+          }
+          .grid-container {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+          }
+          @media (max-width: 768px) {
+            .app-container {
+              padding: 15px !important;
+            }
+            .header {
+              flex-direction: column !important;
+              align-items: flex-start !important;
+              gap: 10px !important;
+            }
+            .grid-container {
+              grid-template-columns: 1fr !important;
+              gap: 15px !important;
+            }
+          }
+          @media (min-width: 769px) and (max-width: 1024px) {
+            .grid-container {
+              grid-template-columns: repeat(2, 1fr) !important;
+            }
+          }
+          @media (min-width: 1025px) {
+            .grid-container {
+              grid-template-columns: repeat(3, 1fr) !important;
+            }
+          }
+        `}
+      </style>
+      <div className="header">
+        <h1 style={{fontSize: 34, fontWeight: 'bold', color: '#2af5c2', textShadow: '0 2px 4px rgba(0,0,0,0.5)', margin: 0}}>✈️ AI AIRCRAFT DISPATCH ADVISOR</h1>
+        <h2 style={{fontSize: 24, fontWeight: 'bold', color: '#7f31e4b8', textShadow: '0 2px 4px rgba(125, 163, 69, 0.03)', margin: 0}}>Fast, Traceable, Trustable Dispatch Decisions</h2>
+      </div>
+
+      <div className="grid-container">
+        <div style={{display: 'grid', gap: 20}}>
+          <div style={cardStyle}>
+            <h3 style={{marginBottom: 12, color: '#ffffff'}}>OPS Mode</h3>
+            <button onClick={() => setOpsMode('Ramp')} style={{marginBottom: 10, width: '100%', padding: 12, borderRadius: 10, fontWeight: '700', cursor: 'pointer', background: 'linear-gradient(135deg, #00d4aa, #00b894)', color: 'white', border: 'none', boxShadow: '0 4px 8px rgba(0,0,0,0.3)'}}>Ramp</button>
+            <button onClick={() => setOpsMode('Turnaround')} style={{width: '100%', padding: 12, borderRadius: 10, fontWeight: '700', cursor: 'pointer', background: 'linear-gradient(135deg, #4a90e2, #357abd)', color: 'white', border: 'none', boxShadow: '0 4px 8px rgba(0,0,0,0.3)'}}>Turnaround</button>
+          </div>
+
+          <div style={cardStyle as React.CSSProperties}>
+            <p style={{fontSize: 16, color: '#87ceeb', marginBottom: 12}}>Select an Aircraft and enter or search a question to get instant guidance</p>
+            <h3 style={{marginBottom: 10, color: '#ffffff'}}>Aircraft</h3>
+            <select 
+              value={aircraft}
+              onChange={(e) => setAircraft(e.target.value)}
+              style={{width: '100%', padding: 12, background: 'rgba(246, 246, 246, 0.95)', color: 'black', borderRadius: 10, border: '1px solid #3ca26d', boxShadow: '0 2px 4px rgba(0,0,0,0.1)'}}
+            >
+              <option style={{color:'black'}} value="Boeing 737 MAX">Boeing 737 MAX</option>
+              <option style={{color:'black'}} value="Airbus A320">Airbus A320</option>
+              <option style={{color:'red'}} value="ATR 72">ATR 72</option>
+              <option style={{color:'black'}} value="Embraer EMB-145">Embraer EMB-145</option>
+            </select>
+
+            <h3 style={{margin: '20px 0 10px', color: '#ffffff'}}>Issue 🎙️</h3>
+            <textarea 
+              value={issue}
+              onChange={(e) => {
+                setIssue(e.target.value);
+                setIsRetrieved(false);
+              }}
+              placeholder='Enter your MEL issue here for instant AI-powered dispatch guidance. For example: "AC Pack Inoperative" or "Nav Display Failed".'
+              style={{width: '100%', height: 80, padding: 2, background: 'rgba(255,255,255,0.2)', color: isRetrieved ? '#00d4aa' : (issue !== 'Enter your MEL issue here for instant AI-powered dispatch guidance. For example: "AC Pack Inoperative" or "Nav Display Failed".' ? '#ffd700' : 'white'), borderRadius: 10, border: '1px solid #4a90e2', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.2)', fontWeight: isRetrieved ? 'bold' : 'normal'}}
+            />
+
+            <div style={{marginTop: 15, display: 'flex', gap: 12}}>
+              <button onClick={voice} style={{flexGrow:1, padding: 12, borderRadius: 12, border: 'none', background: 'linear-gradient(135deg, #07108a, #037d79)', color: 'white', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 8px rgba(70, 15, 34, 0.3)'}}>{listening ? '🔴 Listening...' : '🎤 Voice Control'}</button>
+              <button onClick={analyze} style={{flexGrow:1, padding: 12, borderRadius: 12, border: 'none', background: 'linear-gradient(135deg, #07108a, #7d0360)', color: 'white', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 8px rgba(0,0,0,0.3)'}}>Analyze Dispatch</button>
+            </div>
+            <button onClick={() => { setIssue(''); setIsRetrieved(false); setResult(''); }} style={{marginTop: 12, width: '100%', padding: 12, borderRadius: 12, border: 'none', background: 'linear-gradient(135deg, #ccdfa2, #03247d)', color: 'white', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 8px rgba(0,0,0,0.3)'}}>Reset / Clear Issue Text</button>
+            {!supportSpeech && <div style={{marginTop: 12, color: '#ff6b81'}}>Voice commands not supported here.</div>}
+          </div>
+        </div>
+
+        <div style={{display: 'grid', gap: 20}}>
+          <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20}}>
+            <div style={cardStyle as React.CSSProperties}>
+              <h3 style={{marginBottom: 10, color: '#ffffff'}}>Check</h3>
+              <div style={{fontSize: 20,fontStyle: 'bold-italic', fontWeight: 700, color: '#6de5b3', marginBottom: 14}}>Conditional Dispatch</div>
+              <div style={{marginBottom: 12, color: '#e0e6ed'}}>Current aircraft: <strong style={{color: '#f12121'}}>{aircraft}</strong></div>
+              <div style={{marginBottom: 12, color: '#e0e6ed'}}><strong>Condition:</strong> <span style={{color: result === 'GO' ? '#00d4aa' : result === 'CONDITIONAL' ? '#ffd700' : '#ffffff', fontWeight: 'bold'}}>{result || 'READY'}</span></div>
+              <ul style={{paddingLeft: 18, lineHeight: 1.6, color: '#e0e6ed'}}>
+                <li style={{color: '#f1f5f6', fontWeight: 'bold'}}>Selected Issue Input:</li>  {issue || 'none'}
+                <li style={{color: '#f2f6f5', fontWeight: 'bold'}}>Ops mode: {opsMode}</li>
+                <li style={{color: '#f3f8fb'}}>Recommendations: {requiredActionsForIssue(issue || presets[0]).slice(0, 3).join(', ')}</li>
+              </ul>
+            </div>
+
+            <div style={cardStyle as React.CSSProperties}>
+              <h3 style={{marginBottom: 12, color: '#ffffff'}}>Decision</h3>
+              <div style={{fontSize: 36, fontWeight: 'bold', textAlign: 'center', padding: 24, borderRadius: 16, background: result === 'GO' ? 'linear-gradient(135deg, #4a90e2, #357abd)' : result === 'CONDITIONAL' ? 'linear-gradient(135deg, #667eea, #764ba2)' : 'linear-gradient(135deg, #6c7b95, #4a5568)', color: 'white', boxShadow: '0 6px 12px rgba(0,0,0,0.4)'}}>{result || 'READY'}</div>
+            </div>
+          </div>
+        </div>
+
+        <div style={{display: 'grid', gap: 20}}>
+          <div style={cardStyle as React.CSSProperties}>
+            <h3 style={{marginBottom: 12, color: '#ffffff'}}>History</h3>
+            <div style={{maxHeight: 200, overflowY: 'auto'}}>
+              {history.map((item, index) => (
+                <div key={index} style={{marginBottom: 8, padding: 8, background: 'rgba(255,255,255,0.05)', borderRadius: 8, color: item.includes('GO') ? '#00d4aa' : item.includes('CONDITIONAL') ? '#ffd700' : '#ffffff', fontWeight: item.includes('GO') || item.includes('CONDITIONAL') ? 'bold' : 'normal'}}>
+                  {item}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div style={cardStyle as React.CSSProperties}>
+            <h3 style={{marginBottom: 12, color: '#ffffff'}}>Dispatch Report</h3>
+            <button onClick={createPDF} style={{width: '100%', padding: 12, borderRadius: 10, fontWeight: '700', cursor: 'pointer', ...buttonGradient}}>Generate PDF Report</button>
+            <div style={{marginTop: 12, fontSize: 14, color: '#e0e6ed'}}>
+              <strong>AI Summary:</strong> {aiSummary}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default App;

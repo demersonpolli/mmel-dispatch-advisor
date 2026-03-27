@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using backend.Models;
 using backend.Options;
 using Microsoft.Azure.Cosmos;
@@ -7,6 +8,9 @@ namespace backend.Services;
 
 /// <summary>One page of search results plus an opaque Cosmos continuation token for the next page.</summary>
 public sealed record SearchPage(IReadOnlyList<MmelItemDocument> Items, string? ContinuationToken);
+
+/// <summary>An aircraft's display name and its lowercased partition-key norm.</summary>
+public sealed record AircraftEntry(string DisplayName, string Norm);
 
 public interface ICosmosItemRepository
 {
@@ -44,6 +48,9 @@ public interface ICosmosItemRepository
 
     /// <summary>Deletes and recreates the container, removing all documents.</summary>
     Task PurgeAllAsync(CancellationToken cancellationToken);
+
+    /// <summary>Returns distinct (display name, norm) pairs for every aircraft in the container.</summary>
+    Task<IReadOnlyList<AircraftEntry>> GetDistinctAircraftAsync(CancellationToken cancellationToken);
 }
 
 public sealed class CosmosItemRepository : ICosmosItemRepository
@@ -199,6 +206,28 @@ public sealed class CosmosItemRepository : ICosmosItemRepository
     {
         await _container.DeleteContainerAsync(cancellationToken: cancellationToken);
         _container = (await _database.CreateContainerIfNotExistsAsync(_containerProps, cancellationToken: cancellationToken)).Container;
+    }
+
+    public async Task<IReadOnlyList<AircraftEntry>> GetDistinctAircraftAsync(CancellationToken cancellationToken)
+    {
+        var query = new QueryDefinition("SELECT DISTINCT c.aircraft, c.aircraftNorm FROM c");
+        using var iter = _container.GetItemQueryIterator<AircraftRow>(
+            query, requestOptions: new QueryRequestOptions { MaxItemCount = 50 });
+        var result = new List<AircraftEntry>();
+        while (iter.HasMoreResults)
+        {
+            var page = await iter.ReadNextAsync(cancellationToken);
+            foreach (var row in page)
+                if (!string.IsNullOrWhiteSpace(row.Aircraft))
+                    result.Add(new AircraftEntry(row.Aircraft, row.AircraftNorm));
+        }
+        return result.OrderBy(e => e.DisplayName).ToList();
+    }
+
+    private sealed class AircraftRow
+    {
+        [JsonPropertyName("aircraft")] public string Aircraft { get; set; } = string.Empty;
+        [JsonPropertyName("aircraftNorm")] public string AircraftNorm { get; set; } = string.Empty;
     }
 
     private async Task<IReadOnlyList<MmelItemDocument>> QueryAllAsync(QueryDefinition query, CancellationToken cancellationToken)

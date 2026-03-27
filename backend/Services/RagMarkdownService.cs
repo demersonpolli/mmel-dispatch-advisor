@@ -9,6 +9,8 @@ public interface IRagMarkdownService
 {
     IReadOnlyList<string> GetTopChunks(string userQuery, int count);
     int ChunkCount { get; }
+    /// <summary>Returns the distinct lowercased aircraftNorm values found in the RAG file (from **Aircraft:** headers).</summary>
+    IReadOnlyList<string> GetDistinctAircraftNorms();
 }
 
 /// <summary>Lightweight RAG over mmel_rag.md: splits on ### headings and ranks by token overlap with the user query.</summary>
@@ -59,6 +61,27 @@ public sealed class RagMarkdownService : IRagMarkdownService
     }
 
     public int ChunkCount => _chunks.Value.Count;
+
+    public IReadOnlyList<string> GetDistinctAircraftNorms()
+    {
+        var result = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var chunk in _chunks.Value)
+        {
+            foreach (var line in chunk.Split('\n'))
+            {
+                var t = line.Trim();
+                if (t.StartsWith("- **Aircraft:**", StringComparison.Ordinal))
+                {
+                    var name = t["- **Aircraft:**".Length..].Trim().ToLowerInvariant();
+                    if (!string.IsNullOrEmpty(name))
+                    {
+                        result.Add(name);
+                    }
+                }
+            }
+        }
+        return result.OrderBy(x => x).ToList();
+    }
 
     private static string ResolvePath(string configuredPath)
     {

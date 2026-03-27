@@ -244,11 +244,14 @@ public sealed class DispatchAdvisorService : IDispatchAdvisorService
         IReadOnlyList<string> ragChunks,
         CancellationToken cancellationToken)
     {
-        const string systemPrompt = """
+        var knownNorms = _rag.GetDistinctAircraftNorms();
+        var knownNormsList = string.Join(", ", knownNorms.Select(n => $"\"{n}\""));
+        var systemPrompt = $"""
             You help dispatch advisors query a structured MMEL database.
             You MUST respond with a single JSON object only (no markdown fences).
             Fields:
-            - aircraftNorm: lowercase string matching the aircraft in the data (e.g. "airbus a320", "boeing 737") inferred from the user message and RAG excerpts.
+            - aircraftNorm: MUST be the exact lowercased string from the following list of known aircraft in the database. Pick the best match for the user's query.
+              Known aircraft: {knownNormsList}
             - searchTerms: 3-8 short lowercase phrases to find the malfunction in item descriptions (e.g. "pack", "air conditioning").
             - sequenceCandidates: 0-5 MMEL sequence strings if clearly implied (e.g. "21-21-01"), else [].
             - notes: brief optional string.

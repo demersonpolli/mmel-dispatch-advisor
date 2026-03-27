@@ -139,7 +139,7 @@ try {
     $result = Invoke-RestMethod `
         -Uri $ingestUri `
         -Method Post `
-        -TimeoutSec 3600 `
+        -TimeoutSec 7200 `
         -ErrorAction Stop
 
     Write-Host ""

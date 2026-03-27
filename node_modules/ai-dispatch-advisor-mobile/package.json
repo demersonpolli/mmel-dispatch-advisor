@@ -1,0 +1,36 @@
+{
+  "name": "ai-dispatch-advisor-mobile",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "deploy": "gh-pages -d dist",
+    "start": "expo start",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "web": "vite",
+    "test": "jest"
+  },
+  "homepage": "https://Jojo991.github.io/AI-Aircraft-Dispatch",
+  "dependencies": {
+    "@types/jspdf": "^2.0.0",
+    "expo": "~48.0.18",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^4.2.1",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "react-native-web": "~0.18.10"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@types/react-native": "^0.72.8",
+    "@vitejs/plugin-react": "^4.3.3",
+    "gh-pages": "^6.3.0",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^4.2.1",
+    "typescript": "^5.8.2",
+    "vite": "^5.4.21"
+  }
+}
