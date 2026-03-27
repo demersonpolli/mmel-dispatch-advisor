@@ -604,7 +604,16 @@ function App() {
                   {result || 'READY'}
                 </div>
               </div>
-
+              <button 
+                disabled={foundItems.length === 0} 
+                onClick={createPDF}
+                style={{width: '100%', padding: 12, borderRadius: 10, fontWeight: 'bold', ...buttonGradient, marginBottom: 10, cursor: foundItems.length === 0 ? 'not-allowed' : 'pointer', opacity: foundItems.length === 0 ? 0.5 : 1}}
+              >
+                Generate PDF Report
+              </button>
+              <p style={{fontSize: 12, color: '#666', textAlign: 'center', marginBottom: 20}}>
+                {foundItems.length === 0 ? 'No items retrieved yet. Enter an issue and click analyze.' : `${foundItems.length} items found.`}
+              </p>
             </div>
           </div>
 
@@ -636,16 +645,6 @@ function App() {
 
             <div className="scrollable-card report-flex">
               <h3 style={{marginBottom: 15, fontSize: 16, color: '#fff'}}>MMEL Items</h3>
-              <button 
-                disabled={foundItems.length === 0} 
-                onClick={createPDF}
-                style={{width: '100%', padding: 12, borderRadius: 10, fontWeight: 'bold', ...buttonGradient, marginBottom: 10, cursor: foundItems.length === 0 ? 'not-allowed' : 'pointer', opacity: foundItems.length === 0 ? 0.5 : 1}}
-              >
-                Generate PDF Report
-              </button>
-              <p style={{fontSize: 12, color: '#666', textAlign: 'center'}}>
-                {foundItems.length === 0 ? 'No items retrieved yet. Enter an issue and click analyze.' : `${foundItems.length} items found.`}
-              </p>
               
               <div style={{marginTop: 15}}>
                 {foundItems.map((item, idx) => (
