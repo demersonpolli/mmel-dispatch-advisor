@@ -1,3 +1,14 @@
+Backend Overview
+
+This backend is the core engine of the MMEL Dispatch Advisor, responsible for:
+
+- Transforming raw MMEL data into structured, queryable records
+- Enabling real-time search across aircraft constraints
+- Orchestrating AI-driven dispatch advisory workflows
+- Bridging regulatory documentation with operational decision-making
+
+It combines serverless architecture, distributed storage, and AI agents to deliver fast, explainable, and context-aware recommendations.
+
 # MMEL Dispatch Advisor — Backend
 
 .NET **Azure Functions** (isolated worker, **.NET 8**) that ingests MMEL JSON into **Azure Cosmos DB**, stores page images in **Azure Blob Storage**, exposes search APIs, and runs a **dispatch advisor** flow using **Microsoft Foundry** (Agent Application + Responses API) plus local RAG over `documents/mmel_rag.md`.
