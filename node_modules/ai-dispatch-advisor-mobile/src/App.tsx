@@ -377,7 +377,7 @@ function App() {
           }
           .grid-container {
             display: grid;
-            grid-template-columns: 1.4fr 0.8fr 0.6fr 1.6fr;
+            grid-template-columns: 1.4fr 1.4fr 1.6fr;
             gap: 20px;
             align-items: stretch;
             width: 100%;
@@ -563,10 +563,19 @@ function App() {
             </div>
           </div>
 
-          {/* Column 2: Check */}
+          {/* Column 2: Check & Decision */}
           <div className="dashboard-col">
             <div className="scrollable-card" style={cardStyle as React.CSSProperties}>
-              <h3 style={{marginBottom: 15, fontSize: 16, color: '#fff'}}>Check</h3>
+              <h3 style={{marginBottom: 15, fontSize: 16, color: '#fff'}}>Check & Decision</h3>
+              
+              <div style={{
+                width: '100%', height: 100, borderRadius: 15, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: 'linear-gradient(135deg, #4b5d67, #322f3d)', color: '#fff', fontSize: 32, fontWeight: 'bold',
+                boxShadow: '0 4px 15px rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', marginBottom: 20
+              }}>
+                {result || 'READY'}
+              </div>
+
               <div style={{fontSize: 18, color: '#6de5b3', fontWeight: 'bold', marginBottom: 10}}>Conditional Dispatch</div>
               <div style={{fontSize: 13, marginBottom: 8}}>Current aircraft: <span style={{color: '#ff4b4b', fontWeight: 'bold'}}>{aircraft}</span></div>
               <div style={{fontSize: 14, fontWeight: 'bold', marginBottom: 15}}>Condition: {result || 'READY'}</div>
@@ -583,20 +592,6 @@ function App() {
                 })()}</li>
                 <li><strong>Recommendations:</strong> Evaluate the fault code, Dispatch maintenance crew, Update report</li>
               </ul>
-            </div>
-          </div>
-
-          {/* Column 3: Decision */}
-          <div className="dashboard-col">
-            <div style={cardStyle as React.CSSProperties}>
-              <h3 style={{marginBottom: 15, fontSize: 16, color: '#fff'}}>Decision</h3>
-              <div style={{
-                width: '100%', height: 120, borderRadius: 15, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: 'linear-gradient(135deg, #4b5d67, #322f3d)', color: '#fff', fontSize: 32, fontWeight: 'bold',
-                boxShadow: '0 4px 15px rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)'
-              }}>
-                {result || 'READY'}
-              </div>
             </div>
           </div>
 
