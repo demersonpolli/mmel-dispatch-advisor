@@ -23,16 +23,9 @@ Built with .NET **Azure Functions** (isolated worker, **.NET 8**) that ingests M
 | **Advise** (`POST /api/advise`) | RAG chunks from `mmel_rag.md` → Foundry agent (JSON extraction) → Cosmos + remark cross-references → Foundry agent (Markdown report) → response includes `items`, `images` (carousel URLs), `report`. |
 | **Foundry** | `FoundryAgentChatService` calls `{ApplicationBaseUrl}/responses` with Entra token (`DefaultAzureCredential`). |
 
-```text
-                    ┌─────────────────┐
-  POST /advise      │  Foundry Agent  │  (extraction + report)
-  ─────────────────►│  Responses API  │
-                    └────────┬────────┘
-                             │
-  RAG file ◄────────────────┼──────────► Cosmos DB (items)
-  mmel_rag.md               │
-                             ▼
-                    Blob Storage (JPEGs)
+```mermaid
+<img width="6707" height="3990" alt="image" src="https://github.com/user-attachments/assets/58dd5be9-f23a-4566-a229-71b36171f0d5" />
+
 ```
 
 ## Project layout
