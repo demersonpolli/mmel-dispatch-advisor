@@ -438,14 +438,42 @@ function App() {
             background: rgba(42, 245, 194, 0.05) !important;
             border-color: rgba(42, 245, 194, 0.2) !important;
           }
+          .mmel-carousel {
+            display: flex;
+            flex-direction: row;
+            overflow-x: auto;
+            gap: 15px;
+            padding: 5px 5px 15px 5px;
+            scroll-snap-type: x mandatory;
+            min-height: 200px;
+          }
           .mmel-card {
+            flex: 0 0 350px;
             background: rgba(255, 255, 255, 0.03);
             border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 10px;
-            padding: 12px;
-            margin-bottom: 12px;
-            overflow-wrap: break-word;
-            word-break: break-all;
+            border-radius: 12px;
+            padding: 16px;
+            scroll-snap-align: start;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+          }
+          .mmel-card:hover {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: rgba(42, 245, 194, 0.3);
+            transform: translateY(-2px);
+          }
+          .mmel-card-manual {
+            width: 100%;
+            height: auto;
+            border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.1);
+            background: #000;
+            display: block;
+            margin-top: 5px;
           }
           /* Custom scrollbar */
           ::-webkit-scrollbar {
@@ -646,14 +674,35 @@ function App() {
             <div className="scrollable-card report-flex">
               <h3 style={{marginBottom: 15, fontSize: 16, color: '#fff'}}>MMEL Items</h3>
               
-              <div style={{marginTop: 15}}>
-                {foundItems.map((item, idx) => (
-                  <div key={idx} className="mmel-card">
-                    <div style={{fontWeight: '900', color: '#2af5c2', marginBottom: 5}}>{item.sequence}</div>
-                    <div style={{fontSize: 13, color: '#fff', marginBottom: 8}}>{item.item}</div>
-                    <div style={{fontSize: 11, color: '#aaa'}}>CAT {item.repairCategory} | INST {item.installed} | REQ {item.required}</div>
-                  </div>
-                ))}
+              <div className="mmel-carousel">
+                {foundItems.length === 0 ? (
+                  <p style={{color: '#555', fontStyle: 'italic', padding: 20}}>No items found.</p>
+                ) : (
+                  foundItems.map((item, idx) => (
+                    <div key={idx} className="mmel-card">
+                      <div style={{flex: '0 0 auto'}}>
+                        <div style={{fontWeight: '900', color: '#2af5c2', marginBottom: 5, fontSize: 14}}>{item.sequence}</div>
+                        <div style={{fontSize: 13, color: '#fff', marginBottom: 8, fontWeight: 'bold'}}>{item.item}</div>
+                        <div style={{fontSize: 11, color: '#aaa', marginBottom: 10}}>CAT {item.repairCategory} | INST {item.installed} | REQ {item.required}</div>
+                        <div style={{fontSize: 12, color: '#e0e6ed', lineHeight: 1.4, opacity: 0.9}}>
+                          {item.remarks}
+                        </div>
+                      </div>
+                      
+                      {item.imageUrls && item.imageUrls.length > 0 && (
+                        <div style={{marginTop: 'auto', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 12}}>
+                          <div style={{fontSize: 10, color: '#666', marginBottom: 5, textTransform: 'uppercase', letterSpacing: 1}}>Manual Reference</div>
+                          <img 
+                            src={item.imageUrls[0]} 
+                            alt={`Manual page for ${item.sequence}`}
+                            className="mmel-card-manual"
+                            onError={(e) => (e.currentTarget.style.display = 'none')}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           </div>
