@@ -33,6 +33,7 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [apiError, setApiError] = useState('');
   const [foundItems, setFoundItems] = useState<any[]>([]);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const recognitionRef = React.useRef<any>(null);
 
   // Load aircraft list from the backend
@@ -473,6 +474,67 @@ function App() {
             border-radius: 4px;
             display: block;
             margin-top: 5px;
+            cursor: pointer;
+          }
+          .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(10px);
+            z-index: 9999;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+          }
+          .modal-content {
+            background: #000;
+            width: 95%;
+            max-width: 1000px;
+            height: 95vh;
+            border-radius: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+          }
+          .modal-scroll-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+          }
+          .modal-close {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            width: 40px;
+            height: 40px;
+            background: rgba(255, 255, 255, 0.15);
+            border: none;
+            border-radius: 50%;
+            color: #fff;
+            font-size: 24px;
+            cursor: pointer;
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+          }
+          .modal-close:hover {
+            background: rgba(255, 255, 255, 0.25);
+          }
+          .modal-image {
+            width: 100%;
+            height: auto;
+            display: block;
           }
           /* Custom scrollbar */
           ::-webkit-scrollbar {
@@ -678,7 +740,12 @@ function App() {
                   <p style={{color: '#555', fontStyle: 'italic', padding: 20}}>No items found.</p>
                 ) : (
                   foundItems.map((item, idx) => (
-                    <div key={idx} className="mmel-card">
+                    <div 
+                      key={idx} 
+                      className="mmel-card"
+                      onClick={() => item.imageUrls?.length > 0 && setSelectedImage(item.imageUrls[0])}
+                      style={{cursor: item.imageUrls?.length > 0 ? 'pointer' : 'default'}}
+                    >
                       <div style={{flex: '0 0 auto'}}>
                         <div style={{fontWeight: '900', color: '#2af5c2', marginBottom: 5, fontSize: 14}}>{item.sequence}</div>
                         <div style={{fontSize: 13, color: '#fff', marginBottom: 8, fontWeight: 'bold'}}>{item.item}</div>
@@ -707,6 +774,22 @@ function App() {
           </div>
         </div>
       </div>
+
+      {/* Manual Page Modal */}
+      {selectedImage && (
+        <div className="modal-overlay" onClick={() => setSelectedImage(null)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <button className="modal-close" onClick={() => setSelectedImage(null)}>&times;</button>
+            <div className="modal-scroll-area">
+              <img 
+                src={selectedImage} 
+                alt="Full Manual Page" 
+                className="modal-image"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
