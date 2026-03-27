@@ -605,22 +605,6 @@ function App() {
                 </div>
               </div>
 
-              <div style={{fontSize: 18, color: '#6de5b3', fontWeight: 'bold', marginBottom: 10}}>Conditional Dispatch</div>
-              <div style={{fontSize: 13, marginBottom: 8}}>Current aircraft: <span style={{color: '#ff4b4b', fontWeight: 'bold'}}>{aircraft}</span></div>
-              <div style={{fontSize: 14, fontWeight: 'bold', marginBottom: 15}}>Condition: {result || 'READY'}</div>
-              
-              <ul style={{paddingLeft: 20, fontSize: 13, color: '#e0e6ed', lineHeight: 1.6}}>
-                <li style={{marginBottom: 10}}><strong>Selected Issue Input:</strong> {issue || 'Enter your MEL issue...'}</li>
-                <li style={{marginBottom: 10}}><strong>Ops mode:</strong> {(() => {
-                  const hasM = foundItems.some(i => /^\s*\(M\)/m.test(i.remarks || ''));
-                  const hasO = foundItems.some(i => /^\s*\(O\)/m.test(i.remarks || ''));
-                  if (hasM && hasO) return 'Ramp & Turnaround';
-                  if (hasM) return 'Ramp (M)';
-                  if (hasO) return 'Turnaround (O)';
-                  return 'Standard';
-                })()}</li>
-                <li><strong>Recommendations:</strong> Evaluate the fault code, Dispatch maintenance crew, Update report</li>
-              </ul>
             </div>
           </div>
 
