@@ -99,32 +99,17 @@ public sealed class CosmosItemRepository : ICosmosItemRepository
         if (!string.IsNullOrWhiteSpace(sequenceNorm))
         {
             var seq = sequenceNorm.Trim().ToLowerInvariant();
-            if (string.IsNullOrWhiteSpace(t))
-            {
-                query = new QueryDefinition(
-                        """
-                        SELECT TOP @limit * FROM c
-                        WHERE c.aircraftNorm = @aircraft
-                          AND c.sequenceNorm = @seq
-                        """)
-                    .WithParameter("@limit", limit)
-                    .WithParameter("@aircraft", aircraft)
-                    .WithParameter("@seq", seq);
-            }
-            else
-            {
-                query = new QueryDefinition(
-                        """
-                        SELECT TOP @limit * FROM c
-                        WHERE c.aircraftNorm = @aircraft
-                          AND c.sequenceNorm = @seq
-                          AND (CONTAINS(c.itemNorm, @term) OR CONTAINS(c.remarksNorm, @term))
-                        """)
-                    .WithParameter("@limit", limit)
-                    .WithParameter("@aircraft", aircraft)
-                    .WithParameter("@seq", seq)
-                    .WithParameter("@term", t);
-            }
+            query = new QueryDefinition(
+                    """
+                    SELECT TOP @limit * FROM c
+                    WHERE c.aircraftNorm = @aircraft
+                      AND c.sequenceNorm = @seq
+                      AND (CONTAINS(c.itemNorm, @term) OR CONTAINS(c.remarksNorm, @term))
+                    """)
+                .WithParameter("@limit", limit)
+                .WithParameter("@aircraft", aircraft)
+                .WithParameter("@seq", seq)
+                .WithParameter("@term", t);
         }
         else
         {
@@ -173,30 +158,16 @@ public sealed class CosmosItemRepository : ICosmosItemRepository
         if (!string.IsNullOrWhiteSpace(sequenceNorm))
         {
             var seq = sequenceNorm.Trim().ToLowerInvariant();
-            if (string.IsNullOrWhiteSpace(t))
-            {
-                query = new QueryDefinition(
-                        """
-                        SELECT * FROM c
-                        WHERE c.aircraftNorm = @aircraft
-                          AND c.sequenceNorm = @seq
-                        """)
-                    .WithParameter("@aircraft", aircraft)
-                    .WithParameter("@seq", seq);
-            }
-            else
-            {
-                query = new QueryDefinition(
-                        """
-                        SELECT * FROM c
-                        WHERE c.aircraftNorm = @aircraft
-                          AND c.sequenceNorm = @seq
-                          AND (CONTAINS(c.itemNorm, @term) OR CONTAINS(c.remarksNorm, @term))
-                        """)
-                    .WithParameter("@aircraft", aircraft)
-                    .WithParameter("@seq", seq)
-                    .WithParameter("@term", t);
-            }
+            query = new QueryDefinition(
+                    """
+                    SELECT * FROM c
+                    WHERE c.aircraftNorm = @aircraft
+                      AND c.sequenceNorm = @seq
+                      AND (CONTAINS(c.itemNorm, @term) OR CONTAINS(c.remarksNorm, @term))
+                    """)
+                .WithParameter("@aircraft", aircraft)
+                .WithParameter("@seq", seq)
+                .WithParameter("@term", t);
         }
         else
         {
