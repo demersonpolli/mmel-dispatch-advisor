@@ -24,8 +24,7 @@ Built with .NET **Azure Functions** (isolated worker, **.NET 8**) that ingests M
 | **Foundry** | `FoundryAgentChatService` calls `{ApplicationBaseUrl}/responses` with Entra token (`DefaultAzureCredential`). |
 
 ```mermaid
-<img width="6707" height="3990" alt="image" src="https://github.com/user-attachments/assets/58dd5be9-f23a-4566-a229-71b36171f0d5" />
-
+![Diagrama de Arquitetura - Fluxo Advise](documents/RAG Client Processing-2026-03-27-012846.png)
 ```
 
 ## Project layout
