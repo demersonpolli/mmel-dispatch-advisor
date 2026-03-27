@@ -566,7 +566,7 @@ function App() {
           {/* Column 2: Check & Decision */}
           <div className="dashboard-col">
             <div className="scrollable-card" style={cardStyle as React.CSSProperties}>
-              <h3 style={{marginBottom: 15, fontSize: 16, color: '#fff'}}>Check & Decision</h3>
+              <h3 style={{marginBottom: 15, fontSize: 16, color: '#fff'}}>Dispatch Report</h3>
               
               <div style={{
                 width: '100%', height: 100, borderRadius: 15, display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -622,7 +622,7 @@ function App() {
             </div>
 
             <div className="scrollable-card report-flex">
-              <h3 style={{marginBottom: 15, fontSize: 16, color: '#fff'}}>Dispatch Report</h3>
+              <h3 style={{marginBottom: 15, fontSize: 16, color: '#fff'}}>MMEL Items</h3>
               <button 
                 disabled={foundItems.length === 0} 
                 onClick={createPDF}
