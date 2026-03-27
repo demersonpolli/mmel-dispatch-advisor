@@ -86,20 +86,79 @@ type AdvisorResponse = {
   retrievalNotes: string;
 };
 
+type DispatchChecklistItem = {
+  type: 'maintenance' | 'operational' | 'repair' | 'availability';
+  critical: boolean;
+  label: string;
+  detail: string;
+};
+
+function buildDispatchChecklist(items: AdvisorItem[]): DispatchChecklistItem[] {
+  const repairLabel: Record<string, string> = {
+    A: 'Class A — Repair per remarks',
+    B: 'Class B — Repair within 3 consecutive days',
+    C: 'Class C — Repair within 10 consecutive days',
+    D: 'Class D — Repair within 120 consecutive days',
+  };
+  const checklist: DispatchChecklistItem[] = [];
+
+  for (const item of items.filter(i => !i.fromCrossReference)) {
+    const hasM = /\(M\)/.test(item.remarks);
+    const hasO = /\(O\)/.test(item.remarks);
+
+    if (hasM) {
+      checklist.push({
+        type: 'maintenance',
+        critical: true,
+        label: `Maintenance action required (M) — ${item.sequence}`,
+        detail: item.item,
+      });
+    }
+    if (hasO) {
+      checklist.push({
+        type: 'operational',
+        critical: false,
+        label: `Operational procedure required (O) — ${item.sequence}`,
+        detail: item.item,
+      });
+    }
+    if (item.repairCategory) {
+      checklist.push({
+        type: 'repair',
+        critical: item.repairCategory === 'A',
+        label: repairLabel[item.repairCategory] ?? `Class ${item.repairCategory} — Check remarks`,
+        detail: `${item.sequence} — ${item.item}`,
+      });
+    }
+    if (item.installed && item.required) {
+      checklist.push({
+        type: 'availability',
+        critical: false,
+        label: `Equipment requirement — ${item.sequence}`,
+        detail: `Requires ${item.required} operative · ${item.installed} installed`,
+      });
+    }
+  }
+  return checklist;
+}
+
 function toDispatchResponse(raw: AdvisorResponse, aircraft: string, issue: string): DispatchResponse {
   const primary = raw.items.find(i => !i.fromCrossReference) ?? raw.items[0];
+  const primaryItems = raw.items.filter(i => !i.fromCrossReference);
+  const hasM = primaryItems.some(i => /\(M\)/.test(i.remarks));
+  const hasO = primaryItems.some(i => /\(O\)/.test(i.remarks));
   const severity: Severity =
-    raw.items.length === 0 ? 'no-go'
-    : raw.items.some(i => i.repairCategory === 'A') ? 'go'
-    : 'conditional';
+    raw.items.length === 0 ? 'no-go' : 'conditional';
 
   return {
     query: { aircraft, issue },
     decision: {
       severity,
-      title: severity === 'go' ? 'Dispatch permitted'
-           : severity === 'conditional' ? 'Dispatch permitted with conditions'
-           : 'No items found — review manually',
+      title: severity === 'no-go' ? 'No items found — review manually'
+           : hasM && hasO ? 'Dispatch permitted — maintenance + operational procedures required'
+           : hasM ? 'Dispatch permitted — maintenance action required'
+           : hasO ? 'Dispatch permitted — operational procedure required'
+           : 'Dispatch permitted with conditions',
     },
     summary: raw.report.split('\n\n')[0].replace(/^#+\s*/, '').trim(),
     actions: raw.items.slice(0, 5).map(i => `[${i.repairCategory}] ${i.item} — ${i.sequence}`),
@@ -181,6 +240,18 @@ function statusMeta(severity: Severity) {
   }
 }
 
+function stripMarkdown(text: string): string {
+  return text
+    .replace(/!\[.*?\]\(.*?\)/g, '')          // remove image syntax
+    .replace(/\[(.+?)\]\(.*?\)/g, '$1')       // links → label only
+    .replace(/^#{1,4}\s+/gm, '')              // headings
+    .replace(/\*\*(.+?)\*\*/g, '$1')          // bold
+    .replace(/\*(.+?)\*/g, '$1')              // italic
+    .replace(/`(.+?)`/g, '$1')               // inline code
+    .replace(/\n{3,}/g, '\n\n')              // collapse excess blank lines
+    .trim();
+}
+
 let SpeechRecognition: any = null;
 
 if (typeof window !== 'undefined') {
@@ -199,6 +270,8 @@ export default function App() {
   const [aircraftOptions, setAircraftOptions] = useState<AircraftOption[]>([]);
   const [issueText, setIssueText] = useState('');
   const [ragHints, setRagHints] = useState<RagHint[]>([]);
+  const [advisorRawItems, setAdvisorRawItems] = useState<AdvisorItem[]>([]);
+  const [advisorReport, setAdvisorReport] = useState<string>('');
   const [result, setResult] = useState<DispatchResponse>(FALLBACK_RESPONSE);
   const [loading, setLoading] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
@@ -292,6 +365,8 @@ export default function App() {
       }
 
       const raw = await response.json() as AdvisorResponse;
+      setAdvisorRawItems(raw.items);
+      setAdvisorReport(raw.report ?? '');
       setResult(toDispatchResponse(raw, selectedAircraft, issue));
     } catch (error) {
       console.warn('API failed, using fallback:', error);
@@ -354,6 +429,8 @@ export default function App() {
   const handleReset = () => {
     setIssueText('');
     setResult(FALLBACK_RESPONSE);
+    setAdvisorRawItems([]);
+    setAdvisorReport('');
     setErrorMsg('');
     setManualOpen(false);
     triggerHaptic();
@@ -534,25 +611,70 @@ export default function App() {
                   <Text style={styles.reportTitle}>{result.decision.title}</Text>
                   <Text style={styles.reportSummary}>{result.summary}</Text>
 
-                  <View style={styles.sectionBlock}>
-                    <Text style={styles.sectionTitle}>Actions Required</Text>
-                    {result.actions.map((action, i) => (
-                      <View key={i} style={styles.bulletRow}>
-                        <View style={styles.bulletDot} />
-                        <Text style={styles.bulletText}>{action}</Text>
+                  {advisorRawItems.length > 0 ? (
+                    <View style={styles.sectionBlock}>
+                      <Text style={styles.sectionTitle}>Dispatch Checklist</Text>
+                      {buildDispatchChecklist(advisorRawItems).map((ci, i) => (
+                        <View
+                          key={i}
+                          style={[
+                            styles.checklistRow,
+                            ci.type === 'maintenance' && styles.checklistMaintenance,
+                            ci.type === 'operational' && styles.checklistOperational,
+                            ci.type === 'repair' && styles.checklistRepair,
+                            ci.type === 'availability' && styles.checklistAvailability,
+                          ]}
+                        >
+                          <Text style={styles.checklistIcon}>
+                            {ci.type === 'maintenance' ? '⚠️'
+                              : ci.type === 'operational' ? '📋'
+                              : ci.type === 'repair' ? '🔧'
+                              : '✈️'}
+                          </Text>
+                          <View style={styles.checklistContent}>
+                            <Text style={[styles.checklistLabel, ci.critical && styles.checklistLabelCritical]}>
+                              {ci.label}
+                            </Text>
+                            {ci.detail ? (
+                              <Text style={styles.checklistDetail}>{ci.detail}</Text>
+                            ) : null}
+                          </View>
+                        </View>
+                      ))}
+                    </View>
+                  ) : (
+                    <>
+                      <View style={styles.sectionBlock}>
+                        <Text style={styles.sectionTitle}>Actions Required</Text>
+                        {result.actions.map((action, i) => (
+                          <View key={i} style={styles.bulletRow}>
+                            <View style={styles.bulletDot} />
+                            <Text style={styles.bulletText}>{action}</Text>
+                          </View>
+                        ))}
                       </View>
-                    ))}
-                  </View>
+                      <View style={styles.sectionBlock}>
+                        <Text style={styles.sectionTitle}>Limitations</Text>
+                        {result.limitations.map((item, i) => (
+                          <View key={i} style={styles.bulletRow}>
+                            <View style={styles.bulletDotMuted} />
+                            <Text style={styles.bulletText}>{item}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    </>
+                  )}
 
-                  <View style={styles.sectionBlock}>
-                    <Text style={styles.sectionTitle}>Limitations</Text>
-                    {result.limitations.map((item, i) => (
-                      <View key={i} style={styles.bulletRow}>
-                        <View style={styles.bulletDotMuted} />
-                        <Text style={styles.bulletText}>{item}</Text>
+                  {advisorReport ? (
+                    <View style={styles.sectionBlock}>
+                      <Text style={styles.sectionTitle}>Foundry Analysis</Text>
+                      <View style={styles.reportBlock}>
+                        {stripMarkdown(advisorReport).split('\n\n').map((para, i) => (
+                          <Text key={i} style={styles.reportParagraph}>{para.trim()}</Text>
+                        ))}
                       </View>
-                    ))}
-                  </View>
+                    </View>
+                  ) : null}
                 </View>
 
                 <View style={styles.panel}>
@@ -1047,6 +1169,71 @@ const styles = StyleSheet.create({
     height: 520,
     backgroundColor: '#FFFFFF',
     borderRadius: 24,
+  },
+  reportBlock: {
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.07)',
+  },
+  reportParagraph: {
+    color: '#C8D8F0',
+    fontSize: 14,
+    lineHeight: 22,
+    marginBottom: 10,
+  },
+  checklistRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+    borderRadius: 12,
+    padding: 10,
+    paddingLeft: 12,
+  },
+  checklistMaintenance: {
+    backgroundColor: 'rgba(255,82,82,0.12)',
+    borderLeftWidth: 3,
+    borderLeftColor: 'rgba(255,82,82,0.6)',
+  },
+  checklistOperational: {
+    backgroundColor: 'rgba(255,184,0,0.10)',
+    borderLeftWidth: 3,
+    borderLeftColor: 'rgba(255,184,0,0.55)',
+  },
+  checklistRepair: {
+    backgroundColor: 'rgba(139,163,255,0.08)',
+    borderLeftWidth: 3,
+    borderLeftColor: 'rgba(139,163,255,0.35)',
+  },
+  checklistAvailability: {
+    backgroundColor: 'rgba(41,166,92,0.08)',
+    borderLeftWidth: 3,
+    borderLeftColor: 'rgba(41,166,92,0.35)',
+  },
+  checklistIcon: {
+    fontSize: 15,
+    marginRight: 10,
+    marginTop: 1,
+  },
+  checklistContent: {
+    flex: 1,
+  },
+  checklistLabel: {
+    color: '#E3EBFF',
+    fontSize: 13,
+    fontWeight: '600',
+    lineHeight: 19,
+  },
+  checklistLabelCritical: {
+    color: '#FFB3B3',
+    fontWeight: '700',
+  },
+  checklistDetail: {
+    color: '#8BA3C4',
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: 2,
   },
   ragHints: {
     backgroundColor: 'rgba(139,163,255,0.08)',

@@ -1,13 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { jsPDF } from 'jspdf';
 
-const presets = [
-  'Air Conditioning Pack Inoperative', 
-  'Navigation Display Failed', 
-  'ELT Missing', 
-  'Anti-Ice Fault'
-];
-
 type AircraftOption = { name: string; norm: string };
 
 const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL ?? '';
@@ -33,6 +26,7 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [apiError, setApiError] = useState('');
   const [foundItems, setFoundItems] = useState<any[]>([]);
+  const [foundryReport, setFoundryReport] = useState('');
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const recognitionRef = React.useRef<any>(null);
 
@@ -55,214 +49,410 @@ function App() {
   }, []);
 
   const createPDF = () => {
-    const doc = new jsPDF();
+    try {
+    console.log('createPDF start, foundItems=', foundItems.length, 'reportLen=', foundryReport.length);
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     const pageWidth = doc.internal.pageSize.getWidth();
-    let yPosition = 20;
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 18;
+    const contentWidth = pageWidth - margin * 2;
+    let y = 0;
+    let pageNum = 1;
 
-    // Title
-    doc.setFontSize(20);
+    const repairDeadline = (cat: string) => {
+      switch ((cat || '').toUpperCase()) {
+        case 'A': return 'Cat A - Repair per remarks';
+        case 'B': return 'Cat B - Repair within 3 consecutive days';
+        case 'C': return 'Cat C - Repair within 10 consecutive days';
+        case 'D': return 'Cat D - Repair within 120 consecutive days';
+        default:  return cat ? `Cat ${cat}` : 'Unknown';
+      }
+    };
+
+    const addFooter = () => {
+      doc.setFontSize(7.5);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(160, 160, 160);
+      doc.setDrawColor(200, 200, 200);
+      doc.line(margin, pageHeight - 14, pageWidth - margin, pageHeight - 14);
+      doc.text('MMEL Dispatch Advisor - FOR INTERNAL USE ONLY', margin, pageHeight - 9);
+      doc.text(new Date().toLocaleString(), pageWidth / 2, pageHeight - 9, { align: 'center' });
+      doc.text(`Page ${pageNum}`, pageWidth - margin, pageHeight - 9, { align: 'right' });
+      doc.setTextColor(0, 0, 0);
+      doc.setDrawColor(0, 0, 0);
+    };
+
+    const checkBreak = (needed: number) => {
+      if (y + needed > pageHeight - 20) {
+        addFooter();
+        doc.addPage();
+        pageNum++;
+        y = 18;
+      }
+    };
+
+    const sectionHeader = (num: string, title: string) => {
+      checkBreak(14);
+      doc.setFillColor(12, 28, 72);
+      doc.rect(margin, y, contentWidth, 10, 'F');
+      doc.setFillColor(42, 100, 210);
+      doc.rect(margin, y, 6, 10, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`${num}  ${title}`, margin + 10, y + 6.8);
+      doc.setTextColor(0, 0, 0);
+      y += 14;
+    };
+
+    // ── Dispatch status derived from report text ─────────────────
+    const reportLower = foundryReport.toLowerCase();
+    const dispatchStatus = reportLower.includes('no-go') || reportLower.includes('no go')
+      ? 'NO-GO' : reportLower.includes('conditional') ? 'CONDITIONAL' : 'GO';
+    const statusColor: [number, number, number] =
+      dispatchStatus === 'NO-GO' ? [190, 30, 30] :
+      dispatchStatus === 'CONDITIONAL' ? [180, 110, 0] : [0, 140, 90];
+
+    // ── PAGE HEADER ──────────────────────────────────────────────
+    doc.setFillColor(12, 28, 72);
+    doc.rect(0, 0, pageWidth, 38, 'F');
+    doc.setFillColor(42, 100, 210);
+    doc.rect(0, 0, 7, 38, 'F');
+
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(16);
     doc.setFont('helvetica', 'bold');
-    doc.text('AI AIRCRAFT DISPATCH REPORT', pageWidth / 2, yPosition, { align: 'center' });
-    yPosition += 20;
-
-    // Section: FLIGHT DISPATCH INFORMATION
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text('FLIGHT DISPATCH INFORMATION', 20, yPosition);
-    yPosition += 10;
-
-    doc.setFontSize(12);
+    doc.text('DISPATCH ADVISORY REPORT', pageWidth / 2, 16, { align: 'center' });
+    doc.setFontSize(8.5);
     doc.setFont('helvetica', 'normal');
-    const currentDate = new Date().toLocaleString();
-    doc.text(`Date/Time: ${currentDate}`, 20, yPosition);
-    yPosition += 8;
-    doc.text(`Aircraft: ${aircraft}`, 20, yPosition);
-    yPosition += 8;
+    doc.setTextColor(180, 200, 255);
+    doc.text('MEL Compliance Assessment - Confidential', pageWidth / 2, 24, { align: 'center' });
+
+    // Status badge
+    doc.setFillColor(statusColor[0], statusColor[1], statusColor[2]);
+    doc.roundedRect(pageWidth - margin - 38, 10, 38, 14, 2, 2, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
-    if (isRetrieved) {
-      doc.setTextColor(0, 212, 170); // green
-    } else if (issue !== '') {
-      doc.setTextColor(255, 215, 0); // yellow
-    } else {
-      doc.setTextColor(255, 255, 255); // white
+    doc.text(dispatchStatus, pageWidth - margin - 19, 19.5, { align: 'center' });
+
+    // Info bar
+    doc.setFillColor(235, 240, 255);
+    doc.rect(0, 38, pageWidth, 18, 'F');
+    doc.setTextColor(20, 35, 80);
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`Aircraft:`, margin + 7, 46);
+    doc.setFont('helvetica', 'normal');
+    doc.text(selectedAircraft.name, margin + 24, 46);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`Issue:`, margin + 7, 52);
+    doc.setFont('helvetica', 'normal');
+    const issueShort = doc.splitTextToSize(issue, contentWidth - 60);
+    doc.text(issueShort[0] || '', margin + 20, 52);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(100, 110, 140);
+    doc.text(`Generated: ${new Date().toLocaleString()}`, pageWidth - margin, 52, { align: 'right' });
+
+    doc.setTextColor(0, 0, 0);
+    y = 64;
+
+    // ══════════════════════════════════════════════════════════════
+    // SECTION 1 — MMEL ITEMS FOUND
+    // ══════════════════════════════════════════════════════════════
+    sectionHeader('1', 'MMEL ITEMS FOUND');
+
+    if (foundItems.length === 0) {
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'italic');
+      doc.setTextColor(130, 130, 130);
+      doc.text('No MMEL items retrieved.', margin + 4, y);
+      doc.setTextColor(0, 0, 0);
+      y += 10;
     }
-    doc.text(`Reported MEL Issue: ${issue || 'N/A'}`, 20, yPosition);
-    doc.setTextColor(0, 0, 0); // reset to black
-    doc.setFont('helvetica', 'normal');
-    yPosition += 15;
 
-    // Section: DISPATCH DECISION
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text('DISPATCH DECISION', 20, yPosition);
-    yPosition += 10;
+    foundItems.forEach((item: any, idx: number) => {
+      checkBreak(28);
+      const bgColor: [number, number, number] = idx % 2 === 0 ? [248, 251, 255] : [255, 255, 255];
+      doc.setFillColor(bgColor[0], bgColor[1], bgColor[2]);
+      doc.setDrawColor(210, 220, 240);
+      doc.roundedRect(margin, y, contentWidth, 24, 2, 2, 'FD');
 
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold');
-    doc.text('CHECK', 20, yPosition);
-    yPosition += 8;
+      // Sequence badge
+      doc.setFillColor(42, 100, 210);
+      doc.roundedRect(margin + 3, y + 3, 34, 7, 1, 1, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(7);
+      doc.setFont('helvetica', 'bold');
+      doc.text(item.sequence || '', margin + 20, y + 7.8, { align: 'center' });
 
-    doc.setFont('helvetica', 'normal');
-    const decisionText = result === 'GO' ? 'Dispatch permitted' : 'Dispatch permitted with conditions';
-    doc.text(decisionText, 20, yPosition);
-    yPosition += 15;
+      // Item name
+      doc.setTextColor(15, 28, 70);
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      const nameLines = doc.splitTextToSize(item.item || '', contentWidth - 90);
+      doc.text(nameLines[0] || '', margin + 41, y + 8);
 
-    // Section: OPERATIONAL SUMMARY
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text('OPERATIONAL SUMMARY', 20, yPosition);
-    yPosition += 10;
+      // System + repair info
+      doc.setFontSize(7.5);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(90, 105, 145);
+      doc.text(item.systemTitle || '', margin + 41, y + 14);
+      doc.text(
+        `${repairDeadline(item.repairCategory)}   |   Installed: ${item.installed}   Required: ${item.required}`,
+        margin + 41, y + 20
+      );
 
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'normal');
-    const summaryText = `Dispatch may be allowed because the equipment count required for dispatch is zero, provided placarding and repair interval controls are in place. Installed units: 1. Required for dispatch: 0.`;
-    const splitSummary = doc.splitTextToSize(summaryText, pageWidth - 40);
-    doc.text(splitSummary, 20, yPosition);
-    yPosition += splitSummary.length * 5 + 10;
+      // (M) / (O) flags — right side
+      const hasM = /\(M\)/.test(item.remarks || '');
+      const hasO = /\(O\)/.test(item.remarks || '');
+      let fx = pageWidth - margin - 3;
+      if (hasO) {
+        doc.setFillColor(180, 100, 0);
+        doc.roundedRect(fx - 11, y + 4, 11, 6, 1, 1, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(7);
+        doc.setFont('helvetica', 'bold');
+        doc.text('(O)', fx - 5.5, y + 8.3, { align: 'center' });
+        fx -= 14;
+      }
+      if (hasM) {
+        doc.setFillColor(170, 20, 20);
+        doc.roundedRect(fx - 11, y + 4, 11, 6, 1, 1, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(7);
+        doc.setFont('helvetica', 'bold');
+        doc.text('(M)', fx - 5.5, y + 8.3, { align: 'center' });
+      }
 
-    // Section: REQUIRED ACTIONS
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text('REQUIRED ACTIONS', 20, yPosition);
-    yPosition += 10;
-
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'normal');
-    const actions = requiredActionsForIssue(issue || presets[0]);
-    actions.forEach(action => {
-      const splitAction = doc.splitTextToSize(`• ${action}`, pageWidth - 40);
-      doc.text(splitAction, 20, yPosition);
-      yPosition += splitAction.length * 5;
+      doc.setTextColor(0, 0, 0);
+      y += 27;
     });
-    yPosition += 10;
 
-    // Section: OPERATIONAL LIMITATIONS
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text('OPERATIONAL LIMITATIONS', 20, yPosition);
-    yPosition += 10;
+    y += 4;
 
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'normal');
-    const limitations = [
-      'Dispatch is only acceptable under the approved MEL item wording.',
-      'Repair interval tracking must be active from time of release.'
-    ];
-    limitations.forEach(limitation => {
-      const splitLim = doc.splitTextToSize(`• ${limitation}`, pageWidth - 40);
-      doc.text(splitLim, 20, yPosition);
-      yPosition += splitLim.length * 5;
+    // ══════════════════════════════════════════════════════════════
+    // SECTION 2 — OPERATOR RECOMMENDATION
+    // ══════════════════════════════════════════════════════════════
+    sectionHeader('2', 'OPERATOR RECOMMENDATION (FOUNDRY AI ANALYSIS)');
+
+    const cleanReport = foundryReport
+      .replace(/!\[.*?\]\(.*?\)/g, '')
+      .replace(/\[(.+?)\]\(.*?\)/g, '$1')
+      .replace(/^#{1,4}\s+/gm, '')
+      .replace(/\*\*(.+?)\*\*/g, '$1')
+      .replace(/\*(.+?)\*/g, '$1')
+      .replace(/`(.+?)`/g, '$1')
+      .replace(/^\s*[-\u2013\u2022]\s*/gm, '- ')
+      .trim();
+
+    const reportParagraphs = cleanReport.split(/\n{2,}/).filter(p => p.trim());
+
+    reportParagraphs.forEach(para => {
+      const lines = para.split('\n').filter(l => l.trim());
+      lines.forEach(line => {
+        const isBullet = line.trimStart().startsWith('- ');
+        const isHeading = /^[A-Z\s]{6,}$/.test(line.trim());
+        const indentX = isBullet ? margin + 6 : margin + 2;
+        const wrapWidth = isBullet ? contentWidth - 8 : contentWidth - 4;
+
+        doc.setFontSize(isHeading ? 9 : 8.5);
+        doc.setFont('helvetica', isHeading ? 'bold' : 'normal');
+        doc.setTextColor(isHeading ? 12 : 35, isHeading ? 28 : 45, isHeading ? 72 : 80);
+
+        const wrapped = doc.splitTextToSize(line.trim(), wrapWidth);
+        checkBreak(wrapped.length * 5 + 2);
+
+        if (isBullet) {
+          doc.setFillColor(42, 100, 210);
+          doc.rect(margin + 1.5, y + 1, 2, 2, 'F');
+        }
+        doc.text(wrapped, indentX, y + 4);
+        y += wrapped.length * 5 + 2;
+      });
+      y += 2;
     });
-    yPosition += 10;
 
-    // Section: MMEL TRACEABILITY
-    doc.setFontSize(14);
+    y += 4;
+
+    // ══════════════════════════════════════════════════════════════
+    // SECTION 3 — DISPATCH CHECKLIST
+    // ══════════════════════════════════════════════════════════════
+    sectionHeader('3', 'DISPATCH CHECKLIST');
+
+    // Status banner
+    checkBreak(12);
+    const bannerBg: [number,number,number] = dispatchStatus === 'NO-GO' ? [255, 220, 220] : dispatchStatus === 'CONDITIONAL' ? [255, 245, 210] : [215, 255, 235];
+    doc.setFillColor(bannerBg[0], bannerBg[1], bannerBg[2]);
+    doc.setDrawColor(statusColor[0], statusColor[1], statusColor[2]);
+    doc.setLineWidth(0.5);
+    doc.roundedRect(margin, y, contentWidth, 10, 2, 2, 'FD');
+    doc.setLineWidth(0.2);
+    doc.setFillColor(statusColor[0], statusColor[1], statusColor[2]);
+    doc.roundedRect(margin, y, 4, 10, 1, 1, 'F');
+    doc.setFontSize(9);
     doc.setFont('helvetica', 'bold');
-    doc.text('MMEL TRACEABILITY', 20, yPosition);
-    yPosition += 10;
+    doc.setTextColor(statusColor[0], statusColor[1], statusColor[2]);
+    const statusLabel = dispatchStatus === 'NO-GO'
+      ? 'NO-GO: Aircraft cannot be dispatched. Address all items below before flight.'
+      : dispatchStatus === 'CONDITIONAL'
+      ? 'CONDITIONAL: Dispatch permitted - all conditions below must be met.'
+      : 'GO: Aircraft may be dispatched. Retain documentation per MEL.';
+    doc.text(statusLabel, margin + 7, y + 6.8);
+    doc.setTextColor(0, 0, 0);
+    doc.setDrawColor(0, 0, 0);
+    y += 14;
 
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Record ID: ${aircraft.toLowerCase().replace(' ', '-')}-${(issue || 'N/A').toLowerCase().replace(/[^a-z0-9]/g, '-').slice(0, 10)}-001`, 20, yPosition);
-    yPosition += 8;
-    doc.text(`Equipment: ${issue || 'N/A'}`, 20, yPosition);
+    // Checklist rows
+    foundItems.forEach((item: any) => {
+      const hasM = /\(M\)/.test(item.remarks || '');
+      const hasO = /\(O\)/.test(item.remarks || '');
+      const cat = (item.repairCategory || '').toUpperCase();
 
-    doc.save('dispatch_report.pdf');
+      // Main item row
+      checkBreak(10);
+      doc.setDrawColor(80, 110, 180);
+      doc.setLineWidth(0.4);
+      doc.rect(margin + 3, y + 0.5, 5, 5);
+      doc.setLineWidth(0.2);
+      doc.setFontSize(8.5);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(15, 28, 70);
+      const mainLabel = `[${item.sequence}]  ${item.item}`;
+      const mainWrapped = doc.splitTextToSize(mainLabel, contentWidth - 14);
+      checkBreak(mainWrapped.length * 5 + 2);
+      doc.text(mainWrapped, margin + 11, y + 4.5);
+      y += mainWrapped.length * 5 + 1;
+
+      // Repair deadline sub-row
+      checkBreak(7);
+      doc.setFontSize(7.5);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(70, 85, 130);
+      doc.text(`     ${repairDeadline(cat)}   |   Installed: ${item.installed}   Required: ${item.required}`,
+        margin + 11, y + 3.5);
+      y += 6;
+
+      // (M) row
+      if (hasM) {
+        checkBreak(7);
+        doc.setFillColor(255, 235, 235);
+        doc.rect(margin + 11, y - 0.5, contentWidth - 13, 6.5, 'F');
+        doc.setFontSize(7.5);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(160, 20, 20);
+        doc.text('(M)  Maintenance action required - verify remarks and perform per approved procedure', margin + 13, y + 4);
+        doc.setTextColor(0, 0, 0);
+        y += 7.5;
+      }
+
+      // (O) row
+      if (hasO) {
+        checkBreak(7);
+        doc.setFillColor(255, 245, 220);
+        doc.rect(margin + 11, y - 0.5, contentWidth - 13, 6.5, 'F');
+        doc.setFontSize(7.5);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(150, 90, 0);
+        doc.text('(O)  Operational procedure required - crew must apply procedure per remarks before flight', margin + 13, y + 4);
+        doc.setTextColor(0, 0, 0);
+        y += 7.5;
+      }
+
+      // Separator
+      checkBreak(5);
+      doc.setDrawColor(220, 228, 245);
+      doc.line(margin + 10, y + 1, pageWidth - margin, y + 1);
+      doc.setDrawColor(0, 0, 0);
+      y += 4;
+    });
+
+    // Signature block
+    checkBreak(30);
+    y += 6;
+    doc.setDrawColor(180, 190, 220);
+    doc.setFillColor(248, 250, 255);
+    doc.roundedRect(margin, y, contentWidth, 26, 2, 2, 'FD');
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(40, 55, 100);
+    doc.text('DISPATCHER SIGNATURE', margin + 6, y + 8);
+    doc.text('DATE', margin + contentWidth / 2 + 6, y + 8);
+    doc.setDrawColor(120, 140, 190);
+    doc.line(margin + 6, y + 20, margin + contentWidth / 2 - 6, y + 20);
+    doc.line(margin + contentWidth / 2 + 6, y + 20, pageWidth - margin - 6, y + 20);
+    doc.setTextColor(0, 0, 0);
+    doc.setDrawColor(0, 0, 0);
+    y += 30;
+
+    addFooter();
+
+    console.log('createPDF: calling output blob');
+    const aircraftSlug = selectedAircraft.name.replace(/[^a-zA-Z0-9]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
+    const dateStr = new Date().toISOString().slice(0, 10);
+    const filename = `Dispatch_Report_${aircraftSlug}_${dateStr}.pdf`;
+    const blob = doc.output('blob');
+    console.log('createPDF: blob size=', blob.size);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 1000);
+    } catch (err: any) {
+      console.error('PDF generation failed:', err);
+      alert('Could not generate PDF: ' + (err?.message ?? String(err)));
+    }
   };
 
-
-  const requiredActionsForIssue = (issueText: string) => {
-    const normalized = issueText.toLowerCase();
-    if (normalized.includes('ac pack')) return ['Inspect AC packs', 'Reset circuit breaker', 'Log discrepancy in MEL'];
-    if (normalized.includes('nav display')) return ['Perform NVIS self-test', 'Replace failed display', 'Validate flight plan'];
-    if (normalized.includes('elt')) return ['Verify ELT is installed', 'Replace battery if expired', 'Record in technical log'];
-    if (normalized.includes('anti-ice')) return ['Check pitot heat system', 'Inspect wing anti-ice ducts', 'Perform leak test'];
-    if (!normalized) return ['Confirm issue detail', 'Run full systems check'];
-    return ['Evaluate the fault code', 'Dispatch maintenance crew', 'Update report'];
-  };
 
   const analyze = async () => {
     const queryText = issue.trim();
     if (!queryText) return;
 
-    // Strip (M) and (O) markers from the search query for better RAG/Search matching
-    const cleanedQuery = queryText.replace(/\s*\([mo]\)\s*/gi, ' ').trim();
-    if (!cleanedQuery) return;
-
     setLoading(true);
     setApiError('');
     setResult('');
     setFoundItems([]);
+    setFoundryReport('');
 
     try {
-      // Step 1: Fetch RAG hints using cleaned query
-      const ragUrl = `${API_BASE_URL}/api/rag-hints?q=${encodeURIComponent(cleanedQuery)}&aircraft=${encodeURIComponent(selectedAircraft.norm)}`;
-      const ragResponse = await fetch(ragUrl);
-      if (!ragResponse.ok) throw new Error(`RAG Error ${ragResponse.status}`);
-      const hints = await ragResponse.json();
-
-      if (!hints || hints.length === 0) {
-        setApiError("No relevant MMEL hints found.");
-        setResult('NONE');
-        // Save to history as a structured object
-        setHistory(prev => [{
-          aircraft: selectedAircraft.name, 
-          issue: queryText, 
-          items: []
-        }, ...prev].slice(0, 2));
-        return;
-      }
-
-      // Step 2: Fetch details from Cosmos for each unique sequence
-      const seqToTitle = new Map<string, string>();
-      hints.forEach((h: any) => {
-        if (h.sequence && !seqToTitle.has(h.sequence)) {
-          seqToTitle.set(h.sequence, h.title || '');
-        }
+      const response = await fetch(`${API_BASE_URL}/api/advise`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(API_KEY ? { 'x-functions-key': API_KEY } : {}),
+        },
+        body: JSON.stringify({ query: `${selectedAircraft.norm} ${queryText}` }),
       });
 
-      const uniqueSequences = Array.from(seqToTitle.keys());
-      const allFoundItems: any[] = [];
+      if (!response.ok) throw new Error(`Advise Error ${response.status}`);
 
-      for (const seq of uniqueSequences) {
-        const hintTitle = seqToTitle.get(seq) || cleanedQuery;
-        const searchUrl = `${API_BASE_URL}/api/search?aircraft=${encodeURIComponent(selectedAircraft.norm)}&q=${encodeURIComponent(hintTitle)}&sequence=${encodeURIComponent(String(seq))}`;
-        const searchResponse = await fetch(searchUrl, {
-          headers: {
-            ...(API_KEY ? { 'x-functions-key': API_KEY } : {}),
-          }
-        });
+      const data = await response.json();
+      const items: any[] = data.items ?? [];
 
-        if (searchResponse.ok) {
-          const searchData = await searchResponse.json();
-          if (Array.isArray(searchData)) {
-            allFoundItems.push(...searchData);
-          }
-        }
-      }
+      setFoundItems(items);
+      setFoundryReport(data.report ?? '');
+      setResult(items.length > 0 ? 'CONDITIONAL' : 'NONE');
 
-      setFoundItems(allFoundItems);
-      const status = allFoundItems.length > 0 ? 'CONDITIONAL' : 'NO ITEMS';
-      setResult(status);
-      // Save to history as a structured object
       setHistory(prev => [{
-        aircraft: selectedAircraft.name, 
-        issue: queryText, 
-        items: allFoundItems
+        aircraft: selectedAircraft.name,
+        issue: queryText,
+        items,
       }, ...prev].slice(0, 2));
-      
-      if (allFoundItems.length === 0) {
-        setApiError("No matching items found in Cosmos DB.");
+
+      if (items.length === 0) {
+        setApiError('No matching MMEL items found.');
       }
     } catch (err: any) {
       console.error('Analysis failed:', err);
       setApiError(err.message || 'Unknown error');
       setResult('ERROR');
-      // Save to history even on error
       setHistory(prev => [{
-        aircraft: selectedAircraft.name, 
-        issue: queryText, 
-        items: []
+        aircraft: selectedAircraft.name,
+        issue: queryText,
+        items: [],
       }, ...prev].slice(0, 2));
     } finally {
       setLoading(false);
@@ -659,7 +849,7 @@ function App() {
 
           {/* Column 2: Check & Decision */}
           <div className="dashboard-col">
-            <div className="scrollable-card" style={cardStyle as React.CSSProperties}>
+            <div className="scrollable-card" style={{ ...cardStyle, display: 'flex', flexDirection: 'column', height: '100%', overflowY: 'hidden' } as React.CSSProperties}>
               <h3 style={{marginBottom: 15, fontSize: 16, color: '#fff'}}>Dispatch Report</h3>
               
               <div style={{
@@ -705,6 +895,25 @@ function App() {
               >
                 Generate PDF Report
               </button>
+              <div style={{
+                flex: 1, overflowY: 'auto', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.05)',
+                borderRadius: 15, padding: 15, fontSize: 13, lineHeight: 1.6,
+                color: foundryReport ? '#d0e8ff' : '#999',
+                whiteSpace: 'pre-wrap',
+              }}>
+                {loading
+                  ? 'Analyzing with Foundry AI...'
+                  : foundryReport
+                    ? foundryReport
+                        .replace(/!\[.*?\]\(.*?\)/g, '')
+                        .replace(/\[(.+?)\]\(.*?\)/g, '$1')
+                        .replace(/^#{1,4}\s+/gm, '')
+                        .replace(/\*\*(.+?)\*\*/g, '$1')
+                        .replace(/\*(.+?)\*/g, '$1')
+                        .replace(/`(.+?)`/g, '$1')
+                        .trim()
+                    : 'Foundry analysis results and detailed dispatch guidance will appear here...'}
+              </div>
             </div>
           </div>
 
@@ -751,10 +960,7 @@ function App() {
                       <div style={{flex: '0 0 auto'}}>
                         <div style={{fontWeight: '900', color: '#2af5c2', marginBottom: 5, fontSize: 14}}>{item.sequence}</div>
                         <div style={{fontSize: 13, color: '#fff', marginBottom: 8, fontWeight: 'bold'}}>{item.item}</div>
-                        <div style={{fontSize: 11, color: '#aaa', marginBottom: 10}}>CAT {item.repairCategory} | INST {item.installed} | REQ {item.required}</div>
-                        <div style={{fontSize: 12, color: '#e0e6ed', lineHeight: 1.4, opacity: 0.9}}>
-                          {item.remarks}
-                        </div>
+                        <div style={{fontSize: 11, color: '#aaa'}}>CAT {item.repairCategory} | INST {item.installed} | REQ {item.required}</div>
                       </div>
                       
                       {item.imageUrls && item.imageUrls.length > 0 && (
