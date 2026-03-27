@@ -569,11 +569,18 @@ function App() {
               <h3 style={{marginBottom: 15, fontSize: 16, color: '#fff'}}>Dispatch Report</h3>
               
               <div style={{
-                width: '100%', height: 100, borderRadius: 15, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: 'linear-gradient(135deg, #4b5d67, #322f3d)', color: '#fff', fontSize: 32, fontWeight: 'bold',
-                boxShadow: '0 4px 15px rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', marginBottom: 20
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 15,
+                background: 'rgba(255,255,255,0.02)', borderRadius: 15, padding: '25px 20px', border: '1px solid rgba(255,255,255,0.05)', marginBottom: 20
               }}>
-                {result || 'READY'}
+                <div style={{
+                  width: 80, height: 80, borderRadius: '50%',
+                  background: !result || result === 'READY' ? '#00d4aa' : result === 'CONDITIONAL' ? '#ffd700' : '#ff4b4b',
+                  boxShadow: `0 0 30px ${!result || result === 'READY' ? '#00d4aa' : result === 'CONDITIONAL' ? '#ffd700' : '#ff4b4b'}`,
+                  border: '3px solid rgba(255,255,255,0.3)', transition: 'all 0.5s ease'
+                }} />
+                <div style={{fontSize: 24, fontWeight: '900', color: '#fff', letterSpacing: '2px'}}>
+                  {result || 'READY'}
+                </div>
               </div>
 
               <div style={{fontSize: 18, color: '#6de5b3', fontWeight: 'bold', marginBottom: 10}}>Conditional Dispatch</div>
