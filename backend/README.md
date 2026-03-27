@@ -1,6 +1,18 @@
+
 # MMEL Dispatch Advisor — Backend
 
-.NET **Azure Functions** (isolated worker, **.NET 8**) that ingests MMEL JSON into **Azure Cosmos DB**, stores page images in **Azure Blob Storage**, exposes search APIs, and runs a **dispatch advisor** flow using **Microsoft Foundry** (Agent Application + Responses API) plus local RAG over `documents/mmel_rag.md`.
+Backend Overview
+
+This backend is the core engine of the MMEL Dispatch Advisor, responsible for:
+
+- Transforming raw MMEL data into structured, queryable records
+- Enabling real-time search across aircraft constraints
+- Orchestrating AI-driven dispatch advisory workflows
+- Bridging regulatory documentation with operational decision-making
+
+It combines serverless architecture, distributed storage, and AI agents to deliver fast, explainable, and context-aware recommendations.
+
+Built with .NET **Azure Functions** (isolated worker, **.NET 8**) that ingests MMEL JSON into **Azure Cosmos DB**, stores page images in **Azure Blob Storage**, exposes search APIs, and runs a **dispatch advisor** flow using **Microsoft Foundry** (Agent Application + Responses API) plus local RAG over `documents/mmel_rag.md`.
 
 ## Architecture
 
@@ -11,16 +23,39 @@
 | **Advise** (`POST /api/advise`) | RAG chunks from `mmel_rag.md` → Foundry agent (JSON extraction) → Cosmos + remark cross-references → Foundry agent (Markdown report) → response includes `items`, `images` (carousel URLs), `report`. |
 | **Foundry** | `FoundryAgentChatService` calls `{ApplicationBaseUrl}/responses` with Entra token (`DefaultAzureCredential`). |
 
-```text
-                    ┌─────────────────┐
-  POST /advise      │  Foundry Agent  │  (extraction + report)
-  ─────────────────►│  Responses API  │
-                    └────────┬────────┘
-                             │
-  RAG file ◄────────────────┼──────────► Cosmos DB (items)
-  mmel_rag.md               │
-                             ▼
-                    Blob Storage (JPEGs)
+```mermaid
+graph TD
+    classDef azureFill fill:#0078D4,stroke:#005A9E,color:#ffffff,stroke-width:2px;
+    classDef storageFill fill:#00BCF2,stroke:#0078D4,color:#ffffff,stroke-width:2px;
+    classDef processFill fill:#F2F2F2,stroke:#333,color:#333,stroke-dasharray: 5 5;
+
+    subgraph UserZone ["Client Side"]
+        UI["🖥️ App UI (Vite/React Native Web)"]
+    end
+
+    subgraph AzureFunction ["Azure Functions (.NET 8 Isolated)"]
+        direction TB
+        Advise["⚡ POST /api/advise"]
+        RAGLogic["🔍 RAG Logic (Chunking)"]
+        Foundry["🧠 Microsoft Foundry Agent"]
+    end
+
+    subgraph DataZone ["Storage & AI Search"]
+        Cosmos["🗄️ Azure Cosmos DB (Items)"]
+        Blob["🖼️ Azure Blob Storage (JPEGs)"]
+        RAGFile["📄 mmel_rag.md"]
+    end
+
+    UI ==> Advise
+    Advise --> RAGLogic
+    RAGLogic -- "Context" --> Foundry
+    RAGLogic -.-> RAGFile
+    Foundry -- "Metadata" --> Cosmos
+    Foundry -- "Image Ref" --> Blob
+    
+    class Advise,Foundry azureFill;
+    class Cosmos,Blob,RAGFile storageFill;
+    class AzureFunction processFill;
 ```
 
 ## Project layout
