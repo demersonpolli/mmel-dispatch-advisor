@@ -512,29 +512,34 @@ function App() {
           }
           .modal-close {
             position: absolute;
-            top: 15px;
-            right: 15px;
-            width: 40px;
-            height: 40px;
-            background: rgba(255, 255, 255, 0.15);
-            border: none;
-            border-radius: 50%;
-            color: #fff;
-            font-size: 24px;
+            top: 25px;
+            right: 25px;
+            padding: 8px 16px;
+            background: rgba(0, 0, 0, 0.6);
+            border: 2px solid #2af5c2;
+            border-radius: 30px;
+            color: #2af5c2;
             cursor: pointer;
             z-index: 10000;
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: background 0.2s;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            font-size: 13px;
+            font-weight: 900;
+            letter-spacing: 1px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            text-transform: uppercase;
           }
           .modal-close:hover {
             background: rgba(255, 255, 255, 0.25);
           }
           .modal-image {
-            width: 100%;
+            max-width: 100%;
             height: auto;
             display: block;
+            margin: 0 auto;
+            image-rendering: high-quality;
           }
           /* Custom scrollbar */
           ::-webkit-scrollbar {
@@ -779,7 +784,7 @@ function App() {
       {selectedImage && (
         <div className="modal-overlay" onClick={() => setSelectedImage(null)}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <button className="modal-close" onClick={() => setSelectedImage(null)}>&times;</button>
+            <button className="modal-close" onClick={() => setSelectedImage(null)}>Close</button>
             <div className="modal-scroll-area">
               <img 
                 src={selectedImage} 
