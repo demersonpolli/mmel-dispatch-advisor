@@ -208,7 +208,7 @@ function App() {
           aircraft: selectedAircraft.name, 
           issue: queryText, 
           items: []
-        }, ...prev].slice(0, 10));
+        }, ...prev].slice(0, 2));
         return;
       }
 
@@ -248,7 +248,7 @@ function App() {
         aircraft: selectedAircraft.name, 
         issue: queryText, 
         items: allFoundItems
-      }, ...prev].slice(0, 10));
+      }, ...prev].slice(0, 2));
       
       if (allFoundItems.length === 0) {
         setApiError("No matching items found in Cosmos DB.");
@@ -262,7 +262,7 @@ function App() {
         aircraft: selectedAircraft.name, 
         issue: queryText, 
         items: []
-      }, ...prev].slice(0, 10));
+      }, ...prev].slice(0, 2));
     } finally {
       setLoading(false);
     }
