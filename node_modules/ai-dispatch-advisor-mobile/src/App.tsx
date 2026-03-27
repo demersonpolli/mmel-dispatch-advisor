@@ -468,11 +468,9 @@ function App() {
           }
           .mmel-card-manual {
             width: 100%;
-            max-height: 180px;
+            max-height: 120px;
             object-fit: contain;
-            border-radius: 8px;
-            border: 1px solid rgba(255,255,255,0.1);
-            background: #000;
+            border-radius: 4px;
             display: block;
             margin-top: 5px;
           }
