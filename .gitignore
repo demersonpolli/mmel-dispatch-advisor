@@ -267,3 +267,10 @@ __marimo__/
 .env
 *.dll
 *.exe
+
+# Vite & TypeScript artifacts
+.vite/
+node_modules/.vite/
+*.tsbuildinfo
+*.d.ts
+*.d.ts.map
