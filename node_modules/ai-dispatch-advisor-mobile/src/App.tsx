@@ -399,17 +399,17 @@ function App() {
             overflow-y: auto;
             overflow-x: hidden;
             min-height: 0;
-            border-radius: 12px;
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            padding: 15px;
+            border-radius: 25px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 16px;
           }
           .card-fixed {
             flex: 0 0 auto;
-            border-radius: 12px;
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            padding: 15px;
+            border-radius: 25px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 16px;
           }
           .history-flex {
             flex: 0 0 200px !important;
@@ -710,7 +710,7 @@ function App() {
 
           {/* Column 4: History & Report */}
           <div className="dashboard-col">
-            <div className="scrollable-card history-flex">
+            <div className="scrollable-card history-flex" style={cardStyle as React.CSSProperties}>
               <h3 style={{marginBottom: 15, fontSize: 16, color: '#fff'}}>History</h3>
               {history.length === 0 ? (
                 <p style={{color: '#555', fontStyle: 'italic', textAlign: 'center', marginTop: 40}}>No events recorded</p>
@@ -734,7 +734,7 @@ function App() {
               )}
             </div>
 
-            <div className="scrollable-card report-flex">
+            <div className="scrollable-card report-flex" style={cardStyle as React.CSSProperties}>
               <h3 style={{marginBottom: 15, fontSize: 16, color: '#fff'}}>MMEL Items</h3>
               
               <div className="mmel-carousel">
