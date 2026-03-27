@@ -705,9 +705,6 @@ function App() {
               >
                 Generate PDF Report
               </button>
-              <p style={{fontSize: 12, color: '#666', textAlign: 'center', marginBottom: 20}}>
-                {foundItems.length === 0 ? 'No items retrieved yet. Enter an issue and click analyze.' : `${foundItems.length} items found.`}
-              </p>
             </div>
           </div>
 
