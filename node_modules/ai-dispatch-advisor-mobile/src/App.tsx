@@ -570,15 +570,37 @@ function App() {
               
               <div style={{
                 display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 15,
-                background: 'rgba(255,255,255,0.02)', borderRadius: 15, padding: '25px 20px', border: '1px solid rgba(255,255,255,0.05)', marginBottom: 20
+                background: 'rgba(0,0,0,0.2)', borderRadius: 15, padding: '20px 15px', border: '1px solid rgba(255,255,255,0.05)', marginBottom: 20
               }}>
                 <div style={{
-                  width: 80, height: 80, borderRadius: '50%',
-                  background: !result || result === 'READY' ? '#00d4aa' : result === 'CONDITIONAL' ? '#ffd700' : '#ff4b4b',
-                  boxShadow: `0 0 30px ${!result || result === 'READY' ? '#00d4aa' : result === 'CONDITIONAL' ? '#ffd700' : '#ff4b4b'}`,
-                  border: '3px solid rgba(255,255,255,0.3)', transition: 'all 0.5s ease'
-                }} />
-                <div style={{fontSize: 24, fontWeight: '900', color: '#fff', letterSpacing: '2px'}}>
+                  display: 'flex', flexDirection: 'column', gap: 8, padding: 8, background: '#050505', borderRadius: 20, border: '1px solid #222'
+                }}>
+                  {/* RED LIGHT */}
+                  <div style={{
+                    width: 18, height: 18, borderRadius: '50%',
+                    background: result === 'NONE' ? '#ff4b4b' : '#1a0000',
+                    boxShadow: result === 'NONE' ? '0 0 15px #ff4b4b' : 'none',
+                    border: `1px solid ${result === 'NONE' ? 'rgba(255,255,255,0.4)' : 'transparent'}`,
+                    transition: 'all 0.4s ease'
+                  }} />
+                  {/* YELLOW LIGHT */}
+                  <div style={{
+                    width: 18, height: 18, borderRadius: '50%',
+                    background: result === 'CONDITIONAL' ? '#ffd700' : '#1a1a00',
+                    boxShadow: result === 'CONDITIONAL' ? '0 0 15px #ffd700' : 'none',
+                    border: `1px solid ${result === 'CONDITIONAL' ? 'rgba(255,255,255,0.4)' : 'transparent'}`,
+                    transition: 'all 0.4s ease'
+                  }} />
+                  {/* GREEN LIGHT */}
+                  <div style={{
+                    width: 18, height: 18, borderRadius: '50%',
+                    background: !result || result === 'READY' ? '#00d4aa' : '#001a00',
+                    boxShadow: !result || result === 'READY' ? '0 0 15px #00d4aa' : 'none',
+                    border: `1px solid ${!result || result === 'READY' ? 'rgba(255,255,255,0.4)' : 'transparent'}`,
+                    transition: 'all 0.4s ease'
+                  }} />
+                </div>
+                <div style={{fontSize: 18, fontWeight: '900', color: '#fff', letterSpacing: '1px', textShadow: '0 0 10px rgba(255,255,255,0.2)'}}>
                   {result || 'READY'}
                 </div>
               </div>
