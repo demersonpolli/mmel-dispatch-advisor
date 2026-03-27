@@ -2,7 +2,24 @@
 
 **MMEL Dispatch Advisor** helps operations and dispatch staff work with **Master Minimum Equipment List (MMEL)** data: turning FAA-style MMEL sources into structured data, searchable records, and **natural-language dispatch guidance** grounded in your corpus—with **MMEL page images** surfaced for review on tablets (e.g. carousel UI).
 
-## What this software does
+Problem
+
+Aircraft dispatchers rely on the MMEL (Master Minimum Equipment List) to determine whether an aircraft can legally and safely operate with inoperative equipment.
+
+However:
+
+MMEL documents are dense, technical, and difficult to navigate
+Cross-references between items are manual and error-prone
+Decision-making is often time-sensitive
+There is no natural-language interface to query scenarios
+
+## Solution: MMEL Dispatch Advisor
+
+Transforms static MMEL documentation into a smart advisory system. 
+
+## What this software does ?
+
+Built during a hackathon, this project:
 
 - **Ingests** parsed MMEL JSON (with embedded page images) and stores **items** in **Azure Cosmos DB** for search and lookup, while **JPEGs** live in **Azure Blob Storage** (Cosmos holds paths, not base64).
 - **Searches** by aircraft, item text, optional sequence, and remark text.
