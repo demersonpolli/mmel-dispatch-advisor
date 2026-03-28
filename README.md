@@ -7,6 +7,15 @@
 [![Azure Static Web Apps](https://img.shields.io/badge/Azure_Static_Web_Apps-Free_Tier-0078D4?logo=azure&logoColor=white)](https://learn.microsoft.com/azure/static-web-apps/)
 [![Azure AI Foundry](https://img.shields.io/badge/Azure_AI_Foundry-Grounded_LLM-0078D4?logo=microsoft&logoColor=white)](https://ai.azure.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Live Demo](https://img.shields.io/badge/Live_Demo-Try_It_Now-2ea44f?logo=microsoftazure&logoColor=white)](https://mango-hill-08190c01e.1.azurestaticapps.net/)
+
+---
+
+## 🌐 Live Application
+
+> **[➡ Open the MMEL Dispatch Advisor](https://mango-hill-08190c01e.1.azurestaticapps.net/)**
+
+Hosted on **Azure Static Web Apps** (free tier). No login required — select an aircraft type, describe a defect in plain language, and receive an AI-powered dispatch recommendation grounded in official MMEL documents within seconds.
 
 ---
 
